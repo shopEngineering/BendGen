@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BendGen Help</title>
+    <style>
+        /* === Reset & Base — fully self-contained, no external CSS === */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --border: #2a2a4a;
+            --text: #e0e0e0;
+            --text-dim: #a0a0b8;
+            --accent: #0ea5e9;
+            --accent-dim: #0c87c1;
+            --warn: #f59e0b;
+            --danger: #ef4444;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* === Sidebar Nav === */
+        .help-nav {
+            width: 270px;
+            min-width: 270px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            overflow-y: auto;
+            z-index: 10;
+        }
+        .help-nav .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 20px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+        }
+        .help-nav .back-link:hover { background: var(--bg); }
+        .help-search { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        .help-search input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+            outline: none;
+        }
+        .help-search input:focus { border-color: var(--accent); }
+        .help-search input::placeholder { color: var(--text-dim); }
+        .help-nav .nav-title {
+            padding: 16px 20px 8px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--text-dim);
+            font-weight: 700;
+        }
+        .help-nav ul { list-style: none; }
+        .help-nav li a {
+            display: block;
+            padding: 7px 20px 7px 24px;
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 13px;
+            border-left: 3px solid transparent;
+            transition: all 0.15s;
+        }
+        .help-nav li a:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+        .help-nav li a.active { color: var(--accent); background: rgba(14,165,233,0.08); border-left-color: var(--accent); }
+
+        /* === Main Content === */
+        .help-main {
+            margin-left: 270px;
+            flex: 1;
+            min-width: 0;
+        }
+        .help-content {
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 40px 48px 80px;
+        }
+
+        /* === Typography === */
+        .help-content h1 {
+            font-size: 30px;
+            color: var(--accent);
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .help-content .subtitle {
+            color: var(--text-dim);
+            font-size: 16px;
+            margin-bottom: 32px;
+        }
+        .help-content h2 {
+            font-size: 22px;
+            color: var(--text);
+            margin: 48px 0 16px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+        }
+        .help-content h2:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+        .help-content h3 {
+            font-size: 16px;
+            color: var(--accent);
+            margin: 28px 0 10px;
+        }
+        .help-content p { color: var(--text-dim); margin-bottom: 14px; }
+        .help-content a { color: var(--accent); text-decoration: none; }
+        .help-content a:hover { text-decoration: underline; }
+        .help-content strong { color: var(--text); }
+        .help-content ul, .help-content ol {
+            color: var(--text-dim);
+            padding-left: 24px;
+            margin-bottom: 16px;
+        }
+        .help-content li { margin-bottom: 6px; }
+        .help-content code {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: var(--accent);
+            font-family: 'SF Mono', Consolas, monospace;
+        }
+        .help-content kbd {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-bottom-width: 2px;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 12px;
+            font-family: inherit;
+            color: var(--text);
+            white-space: nowrap;
+        }
+
+        /* === Images === */
+        .help-content img {
+            display: block;
+            max-width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+        .help-content img.diagram {
+            max-width: 420px;
+            background: #fff;
+            padding: 16px;
+        }
+        .help-content img.diagram-wide {
+            max-width: 700px;
+            background: #fff;
+            padding: 16px;
+        }
+        .help-content img.diagram-small {
+            max-width: 220px;
+            background: #fff;
+            padding: 12px;
+        }
+        .img-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin: 16px 0;
+        }
+
+        /* === Callouts === */
+        .callout {
+            background: var(--surface);
+            border-left: 4px solid var(--accent);
+            padding: 14px 18px;
+            border-radius: 0 8px 8px 0;
+            margin: 18px 0;
+        }
+        .callout p { margin: 0; }
+        .callout.warning { border-left-color: var(--warn); }
+        .callout.danger { border-left-color: var(--danger); }
+
+        /* === Step Grid === */
+        .steps { margin: 20px 0; counter-reset: step; }
+        .step {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            counter-increment: step;
+        }
+        .step::before {
+            content: counter(step);
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            margin-top: 2px;
+        }
+        .step-body { flex: 1; color: var(--text-dim); }
+        .step-body strong { color: var(--text); }
+
+        /* === Responsive === */
+        @media (max-width: 900px) {
+            .help-nav { width: 220px; min-width: 220px; }
+            .help-main { margin-left: 220px; }
+            .help-content { padding: 24px; }
+        }
+        @media (max-width: 640px) {
+            .help-nav { display: none; }
+            .help-main { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ====== SIDEBAR ====== -->
+<nav class="help-nav">
+    <a href="/" class="back-link">&larr; Back to BendGen</a>
+    <div class="help-search">
+        <input type="text" id="helpSearch" placeholder="Search help topics...">
+    </div>
+
+    <div class="nav-title">Getting Started</div>
+    <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#quick-start">Quick Start Guide</a></li>
+    </ul>
+
+    <div class="nav-title">Using BendGen</div>
+    <ul>
+        <li><a href="#programs">Programs &amp; Bends</a></li>
+        <li><a href="#bend-fields">Bend Fields Explained</a></li>
+        <li><a href="#advanced-fields">Advanced Settings</a></li>
+        <li><a href="#tooling">Managing Tooling</a></li>
+        <li><a href="#import-dxf">Importing DXF Drawings</a></li>
+        <li><a href="#import-backup">Importing Backups</a></li>
+        <li><a href="#export-zip">Exporting a ZIP</a></li>
+        <li><a href="#units">Unit Switching</a></li>
+        <li><a href="#views">Form vs Table View</a></li>
+    </ul>
+
+    <div class="nav-title">BendControl</div>
+    <ul>
+        <li><a href="#bc-overview">Machine Overview</a></li>
+        <li><a href="#bc-backup-restore">Backup &amp; Restore</a></li>
+        <li><a href="#bc-create-bend">Creating Bends</a></li>
+        <li><a href="#bc-run-program">Running a Program</a></li>
+    </ul>
+
+    <div class="nav-title">Reference</div>
+    <ul>
+        <li><a href="#diagrams">Technical Diagrams</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+    </ul>
+</nav>
+
+<!-- ====== MAIN ====== -->
+<div class="help-main">
+<div class="help-content">
+
+    <h1 id="overview">BendGen Help</h1>
+    <p class="subtitle">Bend Program Generator for Langmuir BendControl</p>
+
+    <p>BendGen is a desktop program generator for the Langmuir Systems BendControl press brake. It lets you create bend programs on your computer, export them as a ZIP file, and restore them onto your press brake via USB drive.</p>
+
+    <div class="callout">
+        <p><strong>What BendGen does:</strong> Creates the same backup ZIP format that the BendControl uses. You build programs and bends in a web interface, export a ZIP, copy it to USB, and restore it on the machine &mdash; just as if you&rsquo;d created the bends directly on the press brake touchscreen.</p>
+    </div>
+
+
+    <!-- ======== QUICK START ======== -->
+    <h2 id="quick-start">Quick Start Guide</h2>
+
+    <div class="steps">
+        <div class="step">
+            <div class="step-body"><strong>Launch BendGen</strong> &mdash; double-click the BendGen executable. Your browser opens to <code>http://localhost:5050</code>.</div>
+        </div>
+        <div class="step">
+            <div class="step-body"><strong>Create a program</strong> &mdash; click <kbd>+ New Program</kbd> in the left sidebar. Give it a name.</div>
+        </div>
+        <div class="step">
+            <div class="step-body"><strong>Add bends</strong> &mdash; click <kbd>+ Add Bend</kbd>. Set the angle, material thickness, bend width, and select your die, punch, and material.</div>
+        </div>
+        <div class="step">
+            <div class="step-body"><strong>Export</strong> &mdash; click <kbd>Export ZIP</kbd> in the header. A backup ZIP file downloads.</div>
+        </div>
+        <div class="step">
+            <div class="step-body"><strong>Copy to USB</strong> &mdash; save the ZIP file to a USB drive.</div>
+        </div>
+        <div class="step">
+            <div class="step-body"><strong>Restore on machine</strong> &mdash; on the BendControl touchscreen, tap the backup/restore icon (&#x23F3;) in the upper-right toolbar, tap <strong>Restore From</strong>, and select the ZIP from USB. See <a href="#bc-backup-restore">Backup &amp; Restore</a> for details.</div>
+        </div>
+    </div>
+
+
+    <!-- ======== PROGRAMS & BENDS ======== -->
+    <h2 id="programs">Programs &amp; Bends</h2>
+
+    <p>BendGen organizes work into <strong>programs</strong>, each containing one or more <strong>bends</strong>. This mirrors the BendControl structure exactly.</p>
+
+    <h3>Creating a Program</h3>
+    <ol>
+        <li>Click <kbd>+ New Program</kbd> in the left sidebar.</li>
+        <li>A new program appears in the list. Click it to select it.</li>
+        <li>Type a name in the program name field at the top of the editor.</li>
+        <li>Click <kbd>Save Program</kbd> to save.</li>
+    </ol>
+
+    <h3>Adding Bends</h3>
+    <ol>
+        <li>With a program selected, click <kbd>+ Add Bend</kbd>.</li>
+        <li>Fill in the bend parameters (see <a href="#bend-fields">Bend Fields</a> below).</li>
+        <li>Add as many bends as needed &mdash; each gets its own card or row.</li>
+        <li>Use <kbd>Duplicate</kbd> to copy a bend with all its settings.</li>
+        <li>Click <kbd>Save Program</kbd> when done.</li>
+    </ol>
+
+
+    <!-- ======== BEND FIELDS ======== -->
+    <h2 id="bend-fields">Bend Fields Explained</h2>
+
+    <h3>Bend Angle (&deg;)</h3>
+    <p>The desired <strong>included angle</strong> of the bend &mdash; the angle between the two faces of the sheet after bending. A 90&deg; bend creates a right angle. Smaller numbers = sharper bend.</p>
+    <img src="/static/help-images/desired_bend_angle.png" alt="Included angle examples" class="diagram">
+
+    <h3>Material Thickness</h3>
+    <p>The thickness of the sheet metal being bent. Measure with calipers for best results. This value is critical &mdash; it directly affects bend depth calculations.</p>
+
+    <h3>Bend Width</h3>
+    <p>The length of the bend line across the workpiece &mdash; how wide the piece is where it contacts the die.</p>
+    <img src="/static/help-images/bend_width.png" alt="Bend width diagram" class="diagram">
+
+    <h3>Punch Clearance</h3>
+    <p>The gap between the punch tip and the top of the material before the bend stroke begins. This is the <strong>safety clearance plane</strong> &mdash; the punch descends at high speed until it reaches this distance above the material, then switches to slower bending speed.</p>
+    <img src="/static/help-images/punch_to_material_clearance.png" alt="Punch to material clearance" class="diagram">
+
+    <div class="callout warning">
+        <p><strong>Safety:</strong> Too small = not enough room to position the workpiece safely. Too large = wasted cycle time. A typical value is 0.1&Prime;.</p>
+    </div>
+
+    <h3>Die / Punch / Material</h3>
+    <p>Select the tooling and material for each bend. These must match what is physically installed on your machine. Add custom tooling via <a href="#tooling">Manage Tooling</a>.</p>
+
+
+    <!-- ======== ADVANCED SETTINGS ======== -->
+    <h2 id="advanced-fields">Advanced Bend Settings</h2>
+
+    <p>Click <kbd>Advanced</kbd> on a bend card to reveal additional fields.</p>
+
+    <h3>Angle Compensation</h3>
+    <p>Adjusts the bend angle to account for springback. If your material springs back 2&deg;, set compensation to 2&deg; with direction <strong>Underbent</strong> to overbend by that amount.</p>
+    <img src="/static/help-images/angle_compensation.png" alt="Angle compensation" class="diagram">
+    <ul>
+        <li><strong>Underbent</strong> &mdash; actual bend is less than desired; machine bends further to compensate.</li>
+        <li><strong>Overbent</strong> &mdash; actual bend is more than desired; machine bends less.</li>
+    </ul>
+
+    <h3>Additional Retract After Bend</h3>
+    <p>Extra distance the ram retracts beyond the default position. Useful for clearance to flip or reposition the workpiece.</p>
+    <img src="/static/help-images/additional_retract_after_bend.png" alt="Additional retract" class="diagram">
+
+    <h3>Back Gauge</h3>
+    <p>Enable to set a precise back gauge position. The back gauge is a motorized finger behind the die that positions the workpiece at a consistent depth.</p>
+    <ul>
+        <li><strong>BG Finger</strong> &mdash; reference edge stop (G54&ndash;G59).</li>
+        <li><strong>X Position</strong> &mdash; distance from die center to back gauge finger.</li>
+        <li><strong>R Position</strong> &mdash; height of the back gauge finger.</li>
+    </ul>
+
+    <h3>Override Final Position</h3>
+    <p>Manually set the exact ram depth, bypassing automatic calculation. Use with caution &mdash; incorrect values can damage tooling.</p>
+
+    <h3>Notes</h3>
+    <p>Free-text notes stored in the backup and visible on the BendControl touchscreen.</p>
+
+
+    <!-- ======== TOOLING ======== -->
+    <h2 id="tooling">Managing Tooling</h2>
+
+    <p>Click <kbd>Manage Tooling</kbd> in the header. BendGen comes with stock tooling preloaded, and you can add your own.</p>
+
+    <h3>Dies</h3>
+    <p>Each die has a <strong>name</strong>, <strong>height</strong>, and <strong>V-die opening</strong>.</p>
+    <div class="img-row">
+        <img src="/static/help-images/die_height.png" alt="Die height" class="diagram-small">
+        <img src="/static/help-images/vdie_opening.png" alt="V-die opening" class="diagram-small">
+    </div>
+
+    <h3>Punches</h3>
+    <p>Each punch has a <strong>name</strong> and <strong>height</strong>.</p>
+    <img src="/static/help-images/punch_height.png" alt="Punch height" class="diagram-small">
+
+    <h3>Materials</h3>
+    <p>Each material has a <strong>name</strong>, <strong>tensile strength</strong> (PSI), <strong>inside radius rule of thumb</strong>, <strong>springback factor</strong>, and an optional <strong>gauge-to-thickness</strong> table. The gauge table auto-fills thickness when you select a gauge in the DXF importer.</p>
+
+
+    <!-- ======== IMPORT DXF ======== -->
+    <h2 id="import-dxf">Importing DXF Drawings</h2>
+
+    <p>BendGen can analyze DXF flat-pattern drawings to automatically detect bend lines and create programs.</p>
+    <ol>
+        <li>Click <kbd>Import DXF Drawing</kbd> in the header.</li>
+        <li>Select a .DXF file from your computer.</li>
+        <li>The DXF preview modal opens showing the drawing with detected bend lines highlighted.</li>
+        <li>Set your <strong>defaults</strong> (material, gauge/thickness, punch, die) in the right panel.</li>
+        <li>Review and reorder bends in the <strong>Bend Order &amp; Assignment</strong> table. Drag rows to reorder.</li>
+        <li>Click <kbd>Create Program</kbd> to generate a program with all detected bends.</li>
+    </ol>
+
+    <div class="callout">
+        <p><strong>Tip:</strong> Hover a bend row in the planner to highlight it in the drawing. Click edges in the table to set the BG X reference per bend.</p>
+    </div>
+
+
+    <!-- ======== IMPORT BACKUP ======== -->
+    <h2 id="import-backup">Importing Existing Backups</h2>
+
+    <p>If you already have programs on your press brake, import them into BendGen to avoid overwriting them.</p>
+    <ol>
+        <li>On the BendControl, create a backup to USB (see <a href="#bc-backup-restore">Backup &amp; Restore</a>).</li>
+        <li>In BendGen, click <kbd>Import Existing Backup</kbd>.</li>
+        <li>Select the ZIP file from your USB drive.</li>
+        <li>All programs and bends from the backup are loaded into BendGen.</li>
+        <li>Add your new programs, then export as usual.</li>
+    </ol>
+
+    <div class="callout warning">
+        <p><strong>Important:</strong> Always import your machine&rsquo;s current backup before adding new programs. Restoring a ZIP on the BendControl replaces all existing programs. Importing first ensures your export includes both old and new programs.</p>
+    </div>
+
+
+    <!-- ======== EXPORT ======== -->
+    <h2 id="export-zip">Exporting a ZIP</h2>
+    <ol>
+        <li>Click <kbd>Export ZIP</kbd> in the header.</li>
+        <li>A ZIP file downloads to your computer.</li>
+        <li>Copy this ZIP to a USB drive.</li>
+        <li>Restore it on the BendControl (see <a href="#bc-backup-restore">Backup &amp; Restore</a>).</li>
+    </ol>
+
+
+    <!-- ======== UNITS ======== -->
+    <h2 id="units">Unit Switching (in / mm)</h2>
+    <p>Use the <kbd>in</kbd> / <kbd>mm</kbd> toggle in the header to switch between inches and millimeters. All linear fields (thickness, width, clearance, positions) convert automatically. Angular values (degrees) are unaffected.</p>
+    <div class="callout">
+        <p><strong>How it works:</strong> The BendControl stores all values in <strong>inches</strong> internally. The millimeter toggle is a convenience for users who prefer to work in metric &mdash; BendGen converts your mm entries to inches behind the scenes when saving. The exported ZIP always contains inch values, which is what the machine expects. You can switch between in and mm at any time without losing precision.</p>
+    </div>
+
+
+    <!-- ======== VIEWS ======== -->
+    <h2 id="views">Form vs Table View</h2>
+    <p>Toggle between <kbd>Form</kbd> and <kbd>Table</kbd> view using the buttons above the bend list.</p>
+    <ul>
+        <li><strong>Form view</strong> &mdash; each bend is a card with labeled fields. Best for editing one bend at a time.</li>
+        <li><strong>Table view</strong> &mdash; all bends in a compact grid. Best for reviewing and comparing multiple bends.</li>
+    </ul>
+
+
+    <!-- ======== BENDCONTROLLER OVERVIEW ======== -->
+    <h2 id="bc-overview">BendControl Overview</h2>
+
+    <p>The BendControl is the Langmuir Systems touchscreen interface on the press brake. Key areas:</p>
+    <ul>
+        <li><strong>Top toolbar</strong> &mdash; Langmuir logo, connection status, version, and action buttons (firmware, bleed hydraulics, machine log, <strong>backup/restore</strong>, WiFi).</li>
+        <li><strong>Left column</strong> &mdash; create bends, select tooling (punch/die/material), manage programs, run bend sequences.</li>
+        <li><strong>Right column</strong> &mdash; live machine state: ram DRO, jog controls, LED indicators, homing, emergency stop.</li>
+    </ul>
+
+
+    <!-- ======== BACKUP & RESTORE ======== -->
+    <h2 id="bc-backup-restore">Backup &amp; Restore</h2>
+
+    <p>This is the key workflow for getting BendGen programs onto your machine.</p>
+
+    <h3>Finding the Backup Button</h3>
+    <p>On the BendControl touchscreen, look at the <strong>top-right corner</strong> of the action bar. The backup/restore button has a <strong>clock/history icon</strong> (&#x23F3;). It sits after the machine log button and before the WiFi button.</p>
+
+    <div class="callout">
+        <p><strong>Action bar layout (left &rarr; right):</strong> Version &rarr; Restart &rarr; System Info &rarr; <em>spacer</em> &rarr; App Update &rarr; Module FW &rarr; Machine FW &rarr; Bleed Hydraulics &rarr; Machine Log &rarr; <strong>&#x23F3; Backup/Restore</strong> &rarr; WiFi</p>
+    </div>
+
+    <h3>Creating a Backup (machine &rarr; USB)</h3>
+    <ol>
+        <li>Insert a USB drive into the BendControl.</li>
+        <li>Tap the <strong>backup/restore icon</strong> (&#x23F3;) in the upper-right toolbar.</li>
+        <li>A popup appears titled <strong>&ldquo;Backups&rdquo;</strong>.</li>
+        <li>Type a name in the text field (e.g., &ldquo;my-bends-march&rdquo;).</li>
+        <li>Tap <strong>Create Backup</strong>.</li>
+        <li>The backup appears in the list. Take the USB to your computer.</li>
+    </ol>
+
+    <h3>Restoring a Backup (USB &rarr; machine)</h3>
+
+    <div class="callout danger">
+        <p><strong>Warning:</strong> Restoring replaces ALL programs on the machine. Always import your current machine backup into BendGen first so you don&rsquo;t lose existing programs.</p>
+    </div>
+
+    <ol>
+        <li>Copy the BendGen-exported ZIP to a USB drive.</li>
+        <li>Insert the USB into the BendControl.</li>
+        <li>Tap the <strong>backup/restore icon</strong> (&#x23F3;) in the upper-right toolbar.</li>
+        <li>At the bottom of the popup, tap <strong>Restore From</strong> (folder icon).</li>
+        <li>A file browser opens. Navigate to and select your ZIP file.</li>
+        <li><strong>Note:</strong> The dialog may show &ldquo;FIRMWARE&rdquo; at the bottom &mdash; <em>ignore this label</em>. It is restoring bend programs, not firmware.</li>
+        <li>After selecting the file, it appears at the top of the list as an <strong>&ldquo;Auto...&rdquo;</strong> entry. Tap <strong>Restore</strong> on that line.</li>
+        <li>Your programs and bends are now loaded on the machine.</li>
+    </ol>
+
+    <h3>Backup Popup Layout</h3>
+    <ul>
+        <li><strong>Header</strong> &mdash; &ldquo;Backups&rdquo; title with close (&times;) button.</li>
+        <li><strong>Create section</strong> &mdash; text field + <strong>Create Backup</strong> button.</li>
+        <li><strong>Backup list</strong> &mdash; scrollable list of existing backups (restore/delete each).</li>
+        <li><strong>Footer</strong> &mdash; <strong>Restore From</strong> button (folder icon) for external files (USB).</li>
+    </ul>
+
+
+    <!-- ======== CREATE BEND ON MACHINE ======== -->
+    <h2 id="bc-create-bend">Creating Bends on the Machine</h2>
+
+    <p>The BendControl&rsquo;s left column has a <strong>Create Bend</strong> view with these fields:</p>
+    <ul>
+        <li>Desired Bend Angle (included angle in degrees)</li>
+        <li>Angle Compensation (with underbent/overbent toggle)</li>
+        <li>Punch-to-Material Clearance</li>
+        <li>Additional Retract After Bend</li>
+        <li>Material Thickness</li>
+        <li>Bend Width</li>
+        <li>Back Gauge (enable/disable, X/R position, jog speed)</li>
+        <li>Override Final Bend Position (enable/disable)</li>
+        <li>Punch / Die / Material selection</li>
+    </ul>
+    <p>BendGen mirrors all of these fields, so programs created in BendGen are fully compatible with the machine.</p>
+
+
+    <!-- ======== RUN PROGRAM ======== -->
+    <h2 id="bc-run-program">Running a Program</h2>
+
+    <p>On the BendControl, once a program is loaded:</p>
+    <ol>
+        <li>Select the program from the dropdown in the left column.</li>
+        <li>The bend list shows all bends in order as cards.</li>
+        <li>Tap a bend to select it as active.</li>
+        <li>The machine displays calculated positions: Start Safety Clearance, Bend Clamp, Final Bend, Retract After Bend, Total Stroke, and Calculated Tonnage.</li>
+        <li>Use the foot pedal and palm switches to execute the bend cycle (see the <a href="#diagrams">vertical position diagram</a>).</li>
+    </ol>
+
+
+    <!-- ======== DIAGRAMS ======== -->
+    <h2 id="diagrams">Technical Diagrams</h2>
+
+    <h3>Vertical Position Diagram</h3>
+    <p>The complete bend cycle from the ram&rsquo;s perspective, showing all key positions:</p>
+    <img src="/static/help-images/vertical_diagram.png" alt="Vertical position diagram" class="diagram-wide">
+
+    <ul>
+        <li><strong>Machine Hard Stop (0.000&Prime;)</strong> &mdash; physical top limit of ram travel.</li>
+        <li><strong>Home Position (-0.050&Prime;)</strong> &mdash; where the ram parks; bend cycle starts here.</li>
+        <li><strong>Retract After Bend</strong> &mdash; where ram returns after the bend.</li>
+        <li><strong>Start Safety Clearance</strong> &mdash; switches from fast approach (palm switches) to slow bend speed (foot pedal).</li>
+        <li><strong>Bend Clamp Position</strong> &mdash; punch contacts material.</li>
+        <li><strong>Final Bend Position</strong> &mdash; deepest point; desired angle achieved.</li>
+    </ul>
+
+    <h3>Ram-to-Table Opening</h3>
+    <img src="/static/help-images/ram_to_table_opening_distance.png" alt="Ram to table opening" class="diagram">
+
+    <h3>Predicted Inside Bend Radius</h3>
+    <img src="/static/help-images/predicted_inner_bend_radius.png" alt="Inside bend radius" class="diagram">
+
+
+    <!-- ======== TROUBLESHOOTING ======== -->
+    <h2 id="troubleshooting">Troubleshooting</h2>
+
+    <h3>BendGen won&rsquo;t start</h3>
+    <ul>
+        <li>Make sure you <strong>extracted the ZIP first</strong> &mdash; don&rsquo;t run the executable from inside the archive.</li>
+        <li><strong>Windows:</strong> SmartScreen may warn &ldquo;Windows protected your PC.&rdquo; Click <strong>More info</strong> &rarr; <strong>Run anyway</strong>.</li>
+        <li><strong>macOS:</strong> Right-click &rarr; <strong>Open</strong> the first time, then click Open in the dialog.</li>
+    </ul>
+
+    <h3>Browser doesn&rsquo;t open automatically</h3>
+    <p>Open your browser manually and go to <code>http://localhost:5050</code>.</p>
+
+    <h3>Exported ZIP doesn&rsquo;t restore on BendControl</h3>
+    <ul>
+        <li>Make sure the ZIP is on the root of the USB drive, not inside a folder.</li>
+        <li>Use the <strong>Restore From</strong> button (folder icon) at the bottom of the backup popup, not the regular backup list.</li>
+    </ul>
+
+    <h3>Programs missing after restore</h3>
+    <p>Restoring a backup <strong>replaces all programs</strong>. Always <kbd>Import Existing Backup</kbd> in BendGen first to include your machine&rsquo;s current programs in the export.</p>
+
+    <h3>The &ldquo;FIRMWARE&rdquo; label appears during restore</h3>
+    <p>Known cosmetic issue in the BendControl UI. Ignore it &mdash; it&rsquo;s loading bend programs, not firmware.</p>
+
+</div>
+</div>
+
+<script>
+/* --- Search --- */
+const searchInput = document.getElementById('helpSearch');
+const navLinks = document.querySelectorAll('.help-nav ul li a');
+const sections = document.querySelectorAll('.help-content h1[id], .help-content h2[id]');
+
+searchInput.addEventListener('input', function() {
+    const q = this.value.toLowerCase().trim();
+    navLinks.forEach(a => {
+        if (!q) { a.parentElement.style.display = ''; return; }
+        const id = a.getAttribute('href').replace('#','');
+        const el = document.getElementById(id);
+        // Search the section heading + next few siblings
+        let text = a.textContent.toLowerCase();
+        if (el) {
+            let sib = el.nextElementSibling;
+            for (let i = 0; i < 8 && sib; i++) {
+                text += ' ' + sib.textContent.toLowerCase();
+                sib = sib.nextElementSibling;
+            }
+        }
+        a.parentElement.style.display = text.includes(q) ? '' : 'none';
+    });
+});
+
+/* --- Active section on scroll --- */
+const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            navLinks.forEach(a => a.classList.remove('active'));
+            const match = document.querySelector('.help-nav a[href="#' + entry.target.id + '"]');
+            if (match) match.classList.add('active');
+        }
+    });
+}, { rootMargin: '-10% 0px -85% 0px' });
+
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

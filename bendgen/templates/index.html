@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BendGen - Bend Program Generator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <h1>
+            <svg class="logo" viewBox="0 0 40 40" width="30" height="30" xmlns="http://www.w3.org/2000/svg">
+                <!-- Die body -->
+                <rect x="4" y="22" width="32" height="16" rx="1" fill="#475569"/>
+                <!-- Die V-groove (air gap below sheet) -->
+                <path d="M12 22 L20 36 L28 22" fill="#1a1a2e"/>
+                <!-- Punch body -->
+                <rect x="17" y="1" width="6" height="12" rx="1" fill="#0ea5e9"/>
+                <!-- Punch tip (narrow, descends into V) -->
+                <path d="M17 13 L20 27 L23 13" fill="#0ea5e9"/>
+                <!-- Sheet metal: flat on die shoulders, bent down to punch tip -->
+                <path d="M0 21 L12 21 L20 27 L28 21 L40 21" stroke="#e94560" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            BendGen
+        </h1>
+        <p class="subtitle">Bend Program Generator for Langmuir BendControl</p>
+        <div class="unit-toggle">
+            <button class="btn btn-tiny unit-toggle-btn active" id="unitInBtn">in</button>
+            <button class="btn btn-tiny unit-toggle-btn" id="unitMmBtn">mm</button>
+        </div>
+        <div class="header-actions">
+            <a href="/help" target="_blank" class="btn btn-secondary" id="helpBtn">Help</a>
+            <button class="btn btn-secondary" id="manageToolingBtn">Manage Tooling</button>
+            <label class="btn btn-secondary" id="importBtn">
+                Import Existing Backup
+                <input type="file" accept=".zip" id="importFile" hidden>
+            </label>
+            <label class="btn btn-secondary" id="importDxfBtn">
+                Import DXF Drawing
+                <input type="file" accept=".dxf,.DXF" id="importDxfFile" hidden>
+            </label>
+            <!-- <label class="btn btn-secondary" id="importImageBtn">
+                Import Image
+                <input type="file" accept="image/*" id="importImageFile" hidden>
+            </label> -->
+            <button class="btn btn-primary" id="exportBtn">Export ZIP</button>
+            <button class="btn btn-danger" id="resetBtn">Reset All</button>
+        </div>
+    </header>
+
+    <div id="importStatus" class="status-bar hidden"></div>
+
+    <main>
+        <section class="programs-panel" id="programsPanel">
+            <div class="panel-header">
+                <h2>Programs</h2>
+                <button class="btn btn-small btn-primary" id="addProgramBtn">+ New Program</button>
+            </div>
+            <ul id="programList" class="program-list"></ul>
+        </section>
+        <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">&lsaquo;</button>
+
+        <section class="editor-panel" id="editorPanel">
+            <div class="no-selection" id="noSelection">
+                <p>Select or create a program to get started</p>
+            </div>
+
+            <div id="programEditor" class="hidden">
+                <div class="program-header">
+                    <input type="text" id="programName" placeholder="Program Name" class="program-name-input">
+                    <button class="btn btn-small btn-secondary" id="saveProgramBtn">Save Program</button>
+                    <button class="btn btn-small btn-danger" id="deleteProgramBtn">Delete</button>
+                </div>
+
+                <div class="bends-header">
+                    <h3>Bends</h3>
+                    <div class="bends-header-actions">
+                        <div class="view-toggle">
+                            <button class="btn btn-tiny view-toggle-btn" id="formViewBtn">Form</button>
+                            <button class="btn btn-tiny view-toggle-btn active" id="tableViewBtn">Table</button>
+                        </div>
+                        <button class="btn btn-small btn-primary" id="addBendBtn">+ Add Bend</button>
+                    </div>
+                </div>
+
+                <div id="bendList" class="bend-list hidden"></div>
+                <div id="bendTable" class="bend-table-wrap"></div>
+            </div>
+        </section>
+    </main>
+
+    <template id="bendTemplate">
+        <div class="bend-card" data-bend-index="">
+            <div class="bend-header">
+                <span class="bend-number"></span>
+                <input type="text" class="bend-name" placeholder="Bend name">
+                <button class="btn btn-tiny btn-secondary bend-view-dxf hidden">View DXF</button>
+                <button class="btn btn-tiny btn-secondary bend-duplicate">Duplicate</button>
+                <button class="btn btn-tiny btn-secondary bend-toggle">Advanced</button>
+                <button class="btn btn-tiny btn-danger bend-remove">Remove</button>
+            </div>
+
+            <div class="bend-fields">
+                <div class="field-row">
+                    <div class="field">
+                        <label>Bend Angle (&deg;)</label>
+                        <input type="number" name="desiredBendAngle" value="90" min="15" max="170" step="0.1">
+                    </div>
+                    <div class="field">
+                        <label>Material Thickness (<span class="unit-label">in</span>)</label>
+                        <input type="number" name="materialThickness" value="0.06" min="0.01" max="2.5" step="0.001" data-linear>
+                    </div>
+                    <div class="field">
+                        <label>Bend Width (<span class="unit-label">in</span>)</label>
+                        <input type="number" name="bendWidth" value="12" min="0.1" max="33.3" step="0.1" data-linear>
+                    </div>
+                    <div class="field">
+                        <label>Punch Clearance (<span class="unit-label">in</span>)</label>
+                        <input type="number" name="punchToMaterialClearance" value="0.1" min="0.01" max="5" step="0.01" data-linear>
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label>Die</label>
+                        <select name="dieId"></select>
+                    </div>
+                    <div class="field">
+                        <label>Punch</label>
+                        <select name="punchId"></select>
+                    </div>
+                    <div class="field">
+                        <label>Material</label>
+                        <select name="materialId"></select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bend-advanced hidden">
+                <div class="field-row">
+                    <div class="field">
+                        <label>Angle Compensation (&deg;)</label>
+                        <input type="number" name="angleCompensation" value="0" min="0" max="90" step="0.1">
+                    </div>
+                    <div class="field">
+                        <label>Compensation Direction</label>
+                        <select name="angleCompensationReversed">
+                            <option value="false">Underbent</option>
+                            <option value="true">Overbent</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Additional Retract (<span class="unit-label">in</span>)</label>
+                        <input type="number" name="additionalRetractAfterBend" value="0" min="0" max="3.75" step="0.01" data-linear>
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label>Back Gauge</label>
+                        <label class="switch">
+                            <input type="checkbox" name="backGaugeRefEdgeStopEnabled" class="bg-toggle">
+                            <span class="switch-slider"></span>
+                            <span class="switch-label">Enabled</span>
+                        </label>
+                    </div>
+                    <div class="field bg-field">
+                        <label>BG Finger</label>
+                        <select name="backGaugeRefEdgeStop" disabled>
+                            <option value="G54">G54 - Finger Lower Edge</option>
+                            <option value="G55">G55 - Finger Upper Edge</option>
+                            <option value="G56">G56 - Custom 1</option>
+                            <option value="G57">G57 - Custom 2</option>
+                            <option value="G58">G58 - Custom 3</option>
+                            <option value="G59">G59 - Custom 4</option>
+                        </select>
+                    </div>
+                    <div class="field bg-field">
+                        <label>X Position (<span class="unit-label">in</span>)</label>
+                        <input type="number" name="backGaugeXPosition" value="0" step="0.001" disabled data-linear>
+                    </div>
+                    <div class="field bg-field">
+                        <label>R Position (<span class="unit-label">in</span>)</label>
+                        <input type="number" name="backGaugeRPosition" value="0" step="0.001" disabled data-linear>
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label>Override Final Position</label>
+                        <label class="switch">
+                            <input type="checkbox" name="overrideFinalBendPositionEnabled" class="override-toggle">
+                            <span class="switch-slider"></span>
+                            <span class="switch-label">Enabled</span>
+                        </label>
+                    </div>
+                    <div class="field">
+                        <label>Final Position Value (<span class="unit-label">in</span>)</label>
+                        <input type="number" name="overriddenFinalBendPosition" value="0" step="0.001" data-linear>
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field full-width">
+                        <label>Notes</label>
+                        <textarea name="notes" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Tooling Management Modal -->
+    <div id="toolingModal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Manage Tooling</h2>
+                <button class="btn btn-tiny btn-secondary" id="closeToolingModal">&times;</button>
+            </div>
+            <div class="modal-tabs">
+                <button class="modal-tab active" data-tab="dies">Dies</button>
+                <button class="modal-tab" data-tab="punches">Punches</button>
+                <button class="modal-tab" data-tab="materials">Materials</button>
+            </div>
+            <div class="modal-body">
+                <!-- Dies tab -->
+                <div class="tab-content active" id="tab-dies">
+                    <div class="tooling-form">
+                        <h4 id="dieFormTitle">Add New Die</h4>
+                        <input type="hidden" id="dieEditId">
+                        <div class="field-row">
+                            <div class="field">
+                                <label>Name</label>
+                                <input type="text" id="dieName" placeholder="e.g. Custom 1in V-Die">
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field">
+                                <label>Height (<span class="unit-label">in</span>)</label>
+                                <input type="number" id="dieHeight" step="0.001" min="0.01" max="8.5" placeholder="0.0">
+                            </div>
+                            <div class="field">
+                                <label>V-Die Opening (<span class="unit-label">in</span>)</label>
+                                <input type="number" id="dieOpening" step="0.001" min="0.01" max="10" placeholder="0.0">
+                            </div>
+                        </div>
+                        <div class="tooling-form-actions">
+                            <button class="btn btn-small btn-primary" id="saveDieBtn">Add Die</button>
+                            <button class="btn btn-small btn-secondary hidden" id="cancelDieEditBtn">Cancel</button>
+                        </div>
+                    </div>
+                    <div class="tooling-list" id="dieList"></div>
+                </div>
+
+                <!-- Punches tab -->
+                <div class="tab-content" id="tab-punches">
+                    <div class="tooling-form">
+                        <h4 id="punchFormTitle">Add New Punch</h4>
+                        <input type="hidden" id="punchEditId">
+                        <div class="field-row">
+                            <div class="field">
+                                <label>Name</label>
+                                <input type="text" id="punchName" placeholder="e.g. Custom Gooseneck Punch">
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field">
+                                <label>Height (<span class="unit-label">in</span>)</label>
+                                <input type="number" id="punchHeight" step="0.001" min="0.01" max="8.5" placeholder="0.0">
+                            </div>
+                        </div>
+                        <div class="tooling-form-actions">
+                            <button class="btn btn-small btn-primary" id="savePunchBtn">Add Punch</button>
+                            <button class="btn btn-small btn-secondary hidden" id="cancelPunchEditBtn">Cancel</button>
+                        </div>
+                    </div>
+                    <div class="tooling-list" id="punchList"></div>
+                </div>
+
+                <!-- Materials tab -->
+                <div class="tab-content" id="tab-materials">
+                    <div class="tooling-form">
+                        <h4 id="materialFormTitle">Add New Material</h4>
+                        <input type="hidden" id="materialEditId">
+                        <div class="field-row">
+                            <div class="field">
+                                <label>Name</label>
+                                <input type="text" id="materialName" placeholder="e.g. 6061-T6 Aluminum">
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field">
+                                <label>Tensile Strength (PSI)</label>
+                                <input type="number" id="materialTensile" step="100" min="1" placeholder="45000">
+                            </div>
+                            <div class="field">
+                                <label>Inside Radius Rule of Thumb</label>
+                                <input type="number" id="materialRadius" step="0.01" min="0" placeholder="0.15">
+                            </div>
+                            <div class="field">
+                                <label>Springback</label>
+                                <input type="number" id="materialSpringback" step="0.1" min="0" max="8.5" placeholder="1.0">
+                            </div>
+                        </div>
+                        <div class="gauge-section">
+                            <h4 style="margin:10px 0 6px">Gauge &rarr; Thickness (in)</h4>
+                            <div class="gauge-grid" id="gaugeGrid"></div>
+                        </div>
+                        <div class="tooling-form-actions">
+                            <button class="btn btn-small btn-primary" id="saveMaterialBtn">Add Material</button>
+                            <button class="btn btn-small btn-secondary hidden" id="cancelMaterialEditBtn">Cancel</button>
+                        </div>
+                    </div>
+                    <div class="tooling-list" id="materialList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DXF Preview Modal -->
+    <div id="dxfPreviewModal" class="modal-overlay hidden">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h2>DXF Drawing — Bend Planner</h2>
+                <button class="btn btn-tiny btn-secondary" id="closeDxfPreview">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="dxf-preview-layout" id="dxfPreviewLayout">
+                    <div class="dxf-svg-column" id="dxfSvgColumn">
+                        <div class="dxf-svg-wrap" id="dxfSvgWrap">
+                            <div id="dxfSvgContainer"></div>
+                        </div>
+                        <p class="dxf-hint">Hover a bend row to highlight it. Click edges in the table to set BG X reference per bend.</p>
+                    </div>
+                    <div class="dxf-resize-handle" id="dxfResizeHandle"></div>
+                    <div class="dxf-controls">
+                        <div class="dxf-info" id="dxfInfo"></div>
+                        <h4 style="margin:6px 0 2px">Defaults</h4>
+                        <div class="dxf-default-row">
+                            <label>Material</label>
+                            <select id="dxfMaterial"></select>
+                        </div>
+                        <div class="dxf-default-row">
+                            <label>Gauge</label>
+                            <select id="dxfGauge"><option value="">—</option></select>
+                        </div>
+                        <div class="dxf-default-row">
+                            <label>Thickness</label>
+                            <input type="number" id="dxfThicknessOverride" step="0.001" min="0.01" max="2.5" placeholder="From gauge or enter">
+                        </div>
+                        <div class="dxf-default-row">
+                            <label>Punch</label>
+                            <select id="dxfPunch"></select>
+                        </div>
+                        <div class="dxf-default-row">
+                            <label>Die</label>
+                            <select id="dxfDie"></select>
+                        </div>
+                        <h4 style="margin:8px 0 4px">Bend Order &amp; Assignment</h4>
+                        <p class="dxf-hint">Drag rows to reorder. Override die/punch per bend if needed.</p>
+                        <div class="dxf-bend-planner" id="dxfBendPlanner"></div>
+                        <div class="dxf-actions">
+                            <button class="btn btn-primary" id="dxfApplyBtn">Create Program</button>
+                            <button class="btn btn-secondary" id="dxfCancelBtn">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
