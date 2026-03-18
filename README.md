@@ -14,17 +14,44 @@ Download the latest release for your platform:
 |----------|------|
 | Windows | [BendGen-Windows.zip](https://github.com/shopEngineering/BendGen/releases/latest) |
 | macOS | [BendGen-macOS.zip](https://github.com/shopEngineering/BendGen/releases/latest) |
+| Linux (x86_64) | [BendGen-Linux.zip](https://github.com/shopEngineering/BendGen/releases/latest) |
+| Raspberry Pi OS | see below |
 
 ## Install & Run
 
+### Windows / macOS / Linux
+
 1. Download the ZIP for your platform from the link above
 2. Unzip the file
-3. Open the **BendGen** folder and double-click **BendGen** (macOS) or **BendGen.exe** (Windows)
+3. Open the **BendGen** folder and double-click **BendGen** (macOS/Linux) or **BendGen.exe** (Windows)
 4. Your browser will open to http://localhost:5050
 
 No Python installation required. Everything is bundled in the download.
 
 > **macOS note:** You may need to right-click > Open the first time to bypass Gatekeeper ("unidentified developer" warning).
+
+### Raspberry Pi OS (run as a network server)
+
+BendGen can run as a server on your Raspberry Pi so any computer on your network can access it from a browser — no install needed on the client side.
+
+Run this one-liner on your Pi:
+
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/shopEngineering/BendGen/main/install-pi.sh)
+```
+
+The installer will:
+- Install Python dependencies via apt
+- Download and install BendGen
+- Optionally set it up as a background service that starts automatically on boot
+
+Once running, open a browser on any device on the same network and go to:
+
+```
+http://<your-pi-ip>:5050
+```
+
+> **Tip:** Find your Pi's IP with `hostname -I` in the terminal.
 
 ## How to Use
 

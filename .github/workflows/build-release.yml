@@ -13,10 +13,10 @@ jobs:
         include:
           - os: windows-latest
             artifact: BendGen-Windows
-            exe_name: BendGen.exe
           - os: macos-latest
             artifact: BendGen-macOS
-            exe_name: BendGen
+          - os: ubuntu-latest
+            artifact: BendGen-Linux
 
     runs-on: ${{ matrix.os }}
 
@@ -43,9 +43,9 @@ jobs:
         run: Compress-Archive -Path dist/BendGen -DestinationPath dist/BendGen-Windows.zip
         shell: pwsh
 
-      - name: Zip (macOS)
-        if: runner.os == 'macOS'
-        run: cd dist && zip -r BendGen-macOS.zip BendGen
+      - name: Zip (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: cd dist && zip -r ${{ matrix.artifact }}.zip BendGen
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -72,4 +72,5 @@ jobs:
           files: |
             artifacts/BendGen-Windows/BendGen-Windows.zip
             artifacts/BendGen-macOS/BendGen-macOS.zip
+            artifacts/BendGen-Linux/BendGen-Linux.zip
           generate_release_notes: true
