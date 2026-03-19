@@ -8,43 +8,25 @@
 </head>
 <body>
     <header>
-        <h1>
-            <svg class="logo" viewBox="0 0 40 40" width="30" height="30" xmlns="http://www.w3.org/2000/svg">
-                <!-- Die body -->
-                <rect x="4" y="22" width="32" height="16" rx="1" fill="#475569"/>
-                <!-- Die V-groove (air gap below sheet) -->
-                <path d="M12 22 L20 36 L28 22" fill="#1a1a2e"/>
-                <!-- Punch body -->
-                <rect x="17" y="1" width="6" height="12" rx="1" fill="#0ea5e9"/>
-                <!-- Punch tip (narrow, descends into V) -->
-                <path d="M17 13 L20 27 L23 13" fill="#0ea5e9"/>
-                <!-- Sheet metal: flat on die shoulders, bent down to punch tip -->
-                <path d="M0 21 L12 21 L20 27 L28 21 L40 21" stroke="#e94560" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            BendGen
-        </h1>
-        <p class="subtitle">Bend Program Generator for Langmuir BendControl</p>
-        <div class="unit-toggle">
-            <button class="btn btn-tiny unit-toggle-btn active" id="unitInBtn">in</button>
-            <button class="btn btn-tiny unit-toggle-btn" id="unitMmBtn">mm</button>
-        </div>
-        <div class="header-actions">
-            <a href="/help" target="_blank" class="btn btn-secondary" id="helpBtn">Help</a>
-            <button class="btn btn-secondary" id="manageToolingBtn">Manage Tooling</button>
-            <label class="btn btn-secondary" id="importBtn">
-                Import Existing Backup
-                <input type="file" accept=".zip" id="importFile" hidden>
-            </label>
-            <label class="btn btn-secondary" id="importDxfBtn">
-                Import DXF Drawing
-                <input type="file" accept=".dxf,.DXF" id="importDxfFile" hidden>
-            </label>
-            <!-- <label class="btn btn-secondary" id="importImageBtn">
-                Import Image
-                <input type="file" accept="image/*" id="importImageFile" hidden>
-            </label> -->
-            <button class="btn btn-primary" id="exportBtn">Export ZIP</button>
-            <button class="btn btn-danger" id="resetBtn">Reset All</button>
+        <div class="header-top">
+            <div class="header-brand">
+                <h1>
+                    <svg class="logo" viewBox="0 0 40 40" width="30" height="30" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="4" y="22" width="32" height="16" rx="1" fill="#475569"/>
+                        <path d="M12 22 L20 36 L28 22" fill="#1a1a2e"/>
+                        <rect x="17" y="1" width="6" height="12" rx="1" fill="#0ea5e9"/>
+                        <path d="M17 13 L20 27 L23 13" fill="#0ea5e9"/>
+                        <path d="M0 21 L12 21 L20 27 L28 21 L40 21" stroke="#e94560" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    BendGen
+                </h1>
+                <p class="subtitle">Bend Program Generator for Langmuir BendControl</p>
+            </div>
+            <div class="header-utils">
+                <button class="btn btn-teal btn-small" id="manageToolingBtn" title="Add, edit, or remove custom dies, punches, and materials">Manage Tooling</button>
+                <a href="/help" target="_blank" class="btn btn-secondary btn-small" id="helpBtn" title="Open the help guide in a new tab">Help</a>
+                <button class="btn btn-danger btn-small" id="resetBtn" title="Erase all programs, bends, and custom tooling — return to factory defaults">Reset All</button>
+            </div>
         </div>
     </header>
 
@@ -52,9 +34,40 @@
 
     <main>
         <section class="programs-panel" id="programsPanel">
-            <div class="panel-header">
-                <h2>Programs</h2>
-                <button class="btn btn-small btn-primary" id="addProgramBtn">+ New Program</button>
+            <div class="panel-accordion" id="accordionBridge">
+                <button class="panel-accordion-toggle" data-accordion="bridge" title="Send and receive files over WiFi via the Pi Zero USB bridge">
+                    <span class="accordion-arrow">&#9662;</span> Network USB Bridge
+                </button>
+                <div class="panel-accordion-body hidden" id="accordionBridgeBody">
+                    <div class="panel-section-buttons">
+                        <button class="btn btn-orange-outline" id="importFromTitanBtn" title="Download backup files from the Titan press brake via the Pi Zero USB bridge">Get Backup from Titan</button>
+                        <button class="btn btn-orange" id="deployBtn" title="Send current programs to the Titan press brake via the Pi Zero USB bridge">Deploy to Titan</button>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-accordion" id="accordionZip">
+                <button class="panel-accordion-toggle active" data-accordion="zip" title="Import or export BendControl backup ZIP files via USB drive">
+                    <span class="accordion-arrow">&#9662;</span> Press Brake ZIP Files (USB)
+                </button>
+                <div class="panel-accordion-body" id="accordionZipBody">
+                    <div class="panel-section-buttons">
+                        <label class="btn btn-teal-outline" id="importBtn" title="Import an existing BendControl backup ZIP to load programs, bends, and tooling">
+                            Import Backup
+                            <input type="file" accept=".zip" id="importFile" hidden>
+                        </label>
+                        <button class="btn btn-teal" id="exportBtn" title="Export all programs and bends as a BendControl-compatible ZIP file">Export ZIP</button>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-section">
+                <h3 class="panel-section-title">Programs</h3>
+                <div class="panel-section-buttons">
+                    <button class="btn btn-primary" id="addProgramBtn" title="Create a new empty bend program">+ New Program</button>
+                    <label class="btn btn-secondary" id="importDxfBtn" title="Import a DXF flat-pattern drawing to auto-detect bends and create a program">
+                        Import DXF
+                        <input type="file" accept=".dxf,.DXF" id="importDxfFile" hidden>
+                    </label>
+                </div>
             </div>
             <ul id="programList" class="program-list"></ul>
         </section>
@@ -68,18 +81,22 @@
             <div id="programEditor" class="hidden">
                 <div class="program-header">
                     <input type="text" id="programName" placeholder="Program Name" class="program-name-input">
-                    <button class="btn btn-small btn-secondary" id="saveProgramBtn">Save Program</button>
+                    <button class="btn btn-small btn-primary" id="saveProgramBtn">Save Program</button>
                     <button class="btn btn-small btn-danger" id="deleteProgramBtn">Delete</button>
                 </div>
 
                 <div class="bends-header">
                     <h3>Bends</h3>
                     <div class="bends-header-actions">
+                        <div class="unit-toggle">
+                            <button class="btn btn-tiny unit-toggle-btn active" id="unitInBtn">in</button>
+                            <button class="btn btn-tiny unit-toggle-btn" id="unitMmBtn">mm</button>
+                        </div>
                         <div class="view-toggle">
                             <button class="btn btn-tiny view-toggle-btn" id="formViewBtn">Form</button>
                             <button class="btn btn-tiny view-toggle-btn active" id="tableViewBtn">Table</button>
                         </div>
-                        <button class="btn btn-small btn-primary" id="addBendBtn">+ Add Bend</button>
+                        <button class="btn btn-small btn-success" id="addBendBtn">+ Add Bend</button>
                     </div>
                 </div>
 
@@ -299,8 +316,8 @@
                             </div>
                         </div>
                         <div class="gauge-section">
-                            <h4 style="margin:10px 0 6px">Gauge &rarr; Thickness (in)</h4>
-                            <div class="gauge-grid" id="gaugeGrid"></div>
+                            <h4 id="gaugeSectionTitle" style="margin:10px 0 6px">Gauge &rarr; Thickness (<span class="unit-label">in</span>)</h4>
+                            <div class="gauge-table-wrap" id="gaugeTableWrap"></div>
                         </div>
                         <div class="tooling-form-actions">
                             <button class="btn btn-small btn-primary" id="saveMaterialBtn">Add Material</button>
@@ -360,6 +377,36 @@
                             <button class="btn btn-secondary" id="dxfCancelBtn">Cancel</button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bridge Settings Modal -->
+    <div id="bridgeModal" class="modal-overlay hidden">
+        <div class="modal" style="max-width:480px">
+            <div class="modal-header">
+                <h2>USB Drive Bridge</h2>
+                <button class="btn btn-tiny btn-secondary" id="closeBridgeModal">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:16px">
+                <p style="margin-bottom:12px;color:var(--text-dim);font-size:13px">
+                    Enter the network address of the Pi Zero running the USB Drive Bridge.
+                </p>
+                <div class="field-row">
+                    <div class="field" style="flex:1">
+                        <label>Bridge Address</label>
+                        <input type="text" id="bridgeAddress" placeholder="e.g. 192.168.1.50:8080 or bendgen-bridge.local:8080">
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+                    <button class="btn btn-small btn-primary" id="bridgeSaveBtn">Save</button>
+                    <button class="btn btn-small btn-secondary" id="bridgeTestBtn">Test Connection</button>
+                    <span id="bridgeTestResult" style="font-size:13px"></span>
+                </div>
+                <div id="bridgeBackupsList" style="margin-top:16px" class="hidden">
+                    <h4 style="margin-bottom:8px">Files on Titan USB</h4>
+                    <div id="bridgeBackupsContent"></div>
                 </div>
             </div>
         </div>

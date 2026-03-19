@@ -31,8 +31,8 @@
 
         /* === Sidebar Nav === */
         .help-nav {
-            width: 270px;
-            min-width: 270px;
+            width: 290px;
+            min-width: 290px;
             background: var(--surface);
             border-right: 1px solid var(--border);
             position: fixed;
@@ -57,40 +57,44 @@
         .help-search { padding: 12px 16px; border-bottom: 1px solid var(--border); }
         .help-search input {
             width: 100%;
-            padding: 8px 12px;
+            padding: 10px 14px;
             border: 1px solid var(--border);
             border-radius: 6px;
             background: var(--bg);
             color: var(--text);
-            font-size: 13px;
+            font-size: 14px;
             outline: none;
         }
         .help-search input:focus { border-color: var(--accent); }
         .help-search input::placeholder { color: var(--text-dim); }
         .help-nav .nav-title {
-            padding: 16px 20px 8px;
-            font-size: 11px;
+            padding: 20px 20px 6px;
+            font-size: 13px;
             text-transform: uppercase;
-            letter-spacing: 1.2px;
-            color: var(--text-dim);
-            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--accent);
+            font-weight: 800;
+            border-top: 1px solid var(--border);
+            margin-top: 4px;
         }
-        .help-nav ul { list-style: none; }
+        .help-nav .nav-title:first-of-type { border-top: none; margin-top: 0; }
+        .help-nav ul { list-style: none; padding-bottom: 4px; }
         .help-nav li a {
             display: block;
-            padding: 7px 20px 7px 24px;
+            padding: 8px 20px 8px 28px;
             color: var(--text-dim);
             text-decoration: none;
-            font-size: 13px;
+            font-size: 14px;
             border-left: 3px solid transparent;
             transition: all 0.15s;
+            line-height: 1.4;
         }
-        .help-nav li a:hover { color: var(--text); background: rgba(255,255,255,0.03); }
-        .help-nav li a.active { color: var(--accent); background: rgba(14,165,233,0.08); border-left-color: var(--accent); }
+        .help-nav li a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+        .help-nav li a.active { color: var(--accent); background: rgba(14,165,233,0.1); border-left-color: var(--accent); font-weight: 600; }
 
         /* === Main Content === */
         .help-main {
-            margin-left: 270px;
+            margin-left: 290px;
             flex: 1;
             min-width: 0;
         }
@@ -226,8 +230,8 @@
 
         /* === Responsive === */
         @media (max-width: 900px) {
-            .help-nav { width: 220px; min-width: 220px; }
-            .help-main { margin-left: 220px; }
+            .help-nav { width: 240px; min-width: 240px; }
+            .help-main { margin-left: 240px; }
             .help-content { padding: 24px; }
         }
         @media (max-width: 640px) {
@@ -262,6 +266,19 @@
         <li><a href="#export-zip">Exporting a ZIP</a></li>
         <li><a href="#units">Unit Switching</a></li>
         <li><a href="#views">Form vs Table View</a></li>
+    </ul>
+
+    <div class="nav-title">Titan USB Bridge</div>
+    <ul>
+        <li><a href="#titan-bridge">Overview</a></li>
+        <li><a href="#titan-parts">What You Need</a></li>
+        <li><a href="#titan-flash-pi">Flash the Pi</a></li>
+        <li><a href="#titan-install">Install the Bridge</a></li>
+        <li><a href="#titan-hardware">Hardware Wiring</a></li>
+        <li><a href="#titan-find-ip">Find the Pi&rsquo;s IP</a></li>
+        <li><a href="#titan-connect-bendgen">Connect BendGen</a></li>
+        <li><a href="#titan-deploy">Deploy &amp; Import</a></li>
+        <li><a href="#titan-troubleshooting">Bridge Troubleshooting</a></li>
     </ul>
 
     <div class="nav-title">BendControl</div>
@@ -479,6 +496,355 @@
         <li><strong>Form view</strong> &mdash; each bend is a card with labeled fields. Best for editing one bend at a time.</li>
         <li><strong>Table view</strong> &mdash; all bends in a compact grid. Best for reviewing and comparing multiple bends.</li>
     </ul>
+
+
+    <!-- ======== TITAN USB BRIDGE ======== -->
+    <h2 id="titan-bridge">Titan USB Bridge</h2>
+
+    <p>The USB Drive Bridge lets you send bend programs directly from BendGen to the Titan press brake over WiFi &mdash; no USB drive swapping. A Raspberry Pi Zero W (or Zero 2W) plugs into the Titan&rsquo;s USB port and acts as a virtual USB flash drive. BendGen talks to the Pi over your shop network.</p>
+
+    <div class="callout">
+        <p><strong>How it works:</strong> The Pi presents itself to the Titan as a regular removable USB drive. When you click <kbd>Deploy</kbd> in BendGen, the Pi briefly &ldquo;ejects&rdquo; the drive, writes your file, and &ldquo;reinserts&rdquo; it. The Titan sees a freshly inserted USB drive with your program on it &mdash; ready to restore.</p>
+    </div>
+
+    <!-- Architecture diagram (ASCII) -->
+    <pre style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;font-size:13px;line-height:1.5;color:var(--text);overflow-x:auto;margin:16px 0">
+    ┌─────────────────┐         WiFi / LAN         ┌──────────────────┐
+    │   Your Computer │ ◄──────────────────────────►│  Pi Zero W / 2W  │
+    │                 │    BendGen talks to Pi       │                  │
+    │  BendGen app    │    on port 8080              │  USB Drive Bridge│
+    │  (browser)      │                              │  (bridge.py)     │
+    └─────────────────┘                              └──────┬───────────┘
+                                                            │ USB cable
+                                                            │ (data port)
+                                                     ┌──────┴───────────┐
+                                                     │   Titan Press    │
+                                                     │   Brake          │
+                                                     │                  │
+                                                     │  Sees a USB      │
+                                                     │  flash drive     │
+                                                     └──────────────────┘
+    </pre>
+
+
+    <!-- ======== WHAT YOU NEED ======== -->
+    <h2 id="titan-parts">What You Need</h2>
+
+    <ul>
+        <li><strong>Raspberry Pi Zero W</strong> or <strong>Raspberry Pi Zero 2W</strong> &mdash; these are the only Pi models with USB OTG on the data port. A Pi 4/5 will <em>not</em> work for this.</li>
+        <li><strong>Micro SD card</strong> &mdash; 8 GB or larger. Class 10 or better.</li>
+        <li><strong>Micro USB to USB-A cable</strong> &mdash; connects the Pi&rsquo;s data port to the Titan&rsquo;s USB port. Must be a <em>data cable</em>, not a charge-only cable.</li>
+        <li><strong>Micro USB power supply</strong> (5V, 2.5A+) &mdash; powers the Pi via its power port.</li>
+        <li><strong>Another computer</strong> &mdash; to flash the SD card and run BendGen.</li>
+        <li><strong>Your shop WiFi network</strong> &mdash; both the Pi and your computer must be on the same network.</li>
+    </ul>
+
+    <div class="callout warning">
+        <p><strong>USB cable note:</strong> The Pi Zero has two micro USB ports. The one labeled <strong>&ldquo;USB&rdquo;</strong> (closest to the center) is the data port. The one labeled <strong>&ldquo;PWR&rdquo;</strong> (on the edge) is power only. You need to connect the <strong>data port</strong> to the Titan.</p>
+    </div>
+
+    <!-- Pi Zero port diagram (ASCII) -->
+    <pre style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;font-size:13px;line-height:1.5;color:var(--text);overflow-x:auto;margin:16px 0">
+     Raspberry Pi Zero W / 2W — Port Layout (top view)
+    ┌───────────────────────────────────────────────────────────┐
+    │                                                           │
+    │  mini HDMI        micro USB          micro USB            │
+    │  (video)          (USB DATA)         (POWER)              │
+    │                   ◄── to Titan       ◄── to power supply  │
+    │                                                           │
+    └───────────────────────────────────────────────────────────┘
+       ▲ SD card slot (underneath)
+    </pre>
+
+
+    <!-- ======== FLASH THE PI ======== -->
+    <h2 id="titan-flash-pi">Step 1: Flash Raspberry Pi OS</h2>
+
+    <div class="steps">
+        <div class="step">
+            <div class="step-body">
+                <strong>Download Raspberry Pi Imager</strong> from
+                <code>raspberrypi.com/software</code>. Install it on your computer (Windows, macOS, or Linux).
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Insert the micro SD card</strong> into your computer (use an adapter if needed).
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Open Raspberry Pi Imager</strong> and configure:
+                <ul style="margin-top:8px">
+                    <li><strong>Device:</strong> Raspberry Pi Zero W (or Zero 2W)</li>
+                    <li><strong>Operating System:</strong> Raspberry Pi OS (32-bit) &mdash; the &ldquo;Lite&rdquo; version is fine (no desktop needed)</li>
+                    <li><strong>Storage:</strong> your SD card</li>
+                </ul>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Click the gear icon</strong> (or &ldquo;Edit Settings&rdquo;) to open advanced options. This is critical:
+                <ul style="margin-top:8px">
+                    <li><strong>Set hostname:</strong> <code>bendgen-bridge</code> (so you can find it on the network as <code>bendgen-bridge.local</code>)</li>
+                    <li><strong>Enable SSH:</strong> check &ldquo;Enable SSH&rdquo; and select &ldquo;Use password authentication&rdquo;</li>
+                    <li><strong>Set username/password:</strong> pick something you&rsquo;ll remember (e.g., user: <code>pi</code>, password: your choice)</li>
+                    <li><strong>Configure WiFi:</strong> enter your shop WiFi network name (SSID) and password. Set the country code.</li>
+                </ul>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Click &ldquo;Write&rdquo;</strong> and wait for the image to finish writing and verifying. This takes a few minutes.
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Eject the SD card</strong> and insert it into the Pi Zero&rsquo;s SD card slot (on the underside of the board).
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ======== INSTALL THE BRIDGE ======== -->
+    <h2 id="titan-install">Step 2: Install the USB Drive Bridge</h2>
+
+    <div class="steps">
+        <div class="step">
+            <div class="step-body">
+                <strong>Power on the Pi</strong> by connecting the power supply to the <strong>PWR</strong> micro USB port. Wait 1&ndash;2 minutes for the first boot (it will resize the filesystem and connect to WiFi).
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>SSH into the Pi</strong> from your computer. Open a terminal and run:
+                <pre style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin:8px 0;font-size:13px;color:var(--accent)">ssh pi@bendgen-bridge.local</pre>
+                <p>Accept the fingerprint prompt and enter the password you set in the Imager.</p>
+                <p style="color:var(--text-dim);font-size:13px">(If <code>bendgen-bridge.local</code> doesn&rsquo;t resolve, see <a href="#titan-find-ip">Find the Pi&rsquo;s IP</a> below.)</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Download and run the installer</strong>:
+                <pre style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin:8px 0;font-size:13px;color:var(--accent)">curl -sSL https://raw.githubusercontent.com/shopEngineering/BendGen_USB_drive_PiZero/master/install.sh -o install.sh
+bash install.sh</pre>
+                <p>The installer will:</p>
+                <ul style="margin-top:6px">
+                    <li>Install Python and dependencies</li>
+                    <li>Enable USB OTG gadget mode (<code>dwc2</code> kernel overlay)</li>
+                    <li>Create a 512 MB FAT32 disk image</li>
+                    <li>Configure the USB mass storage gadget (configfs)</li>
+                    <li>Install systemd services for automatic startup</li>
+                </ul>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Reboot when prompted.</strong> The installer will ask &mdash; say yes. After reboot, the Pi will automatically start the USB gadget and the bridge API.
+            </div>
+        </div>
+    </div>
+
+    <div class="callout">
+        <p><strong>After reboot:</strong> The bridge API starts automatically on port <strong>8080</strong>. You can verify by SSH-ing back in and running: <code>sudo systemctl status usb-bridge</code></p>
+    </div>
+
+
+    <!-- ======== HARDWARE WIRING ======== -->
+    <h2 id="titan-hardware">Step 3: Connect to the Titan</h2>
+
+    <div class="steps">
+        <div class="step">
+            <div class="step-body">
+                <strong>Power off the Pi</strong> (unplug the power cable).
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Connect the USB data cable</strong> from the Pi&rsquo;s <strong>USB data port</strong> (center port) to any open <strong>USB-A port on the Titan</strong>.
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Connect the power supply</strong> to the Pi&rsquo;s <strong>PWR port</strong> (edge port).
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Wait ~30 seconds</strong> for the Pi to boot. The Titan should detect a new USB drive. You can verify by checking if the Titan&rsquo;s file browser shows a USB device.
+            </div>
+        </div>
+    </div>
+
+    <!-- Wiring diagram (ASCII) -->
+    <pre style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;font-size:13px;line-height:1.5;color:var(--text);overflow-x:auto;margin:16px 0">
+                    POWER SUPPLY (5V)
+                         │
+                         │ micro USB
+                         ▼
+    ┌────────────────────────────────────────┐
+    │          Pi Zero W / 2W                │
+    │                                        │
+    │   [HDMI]    [USB DATA]    [PWR IN]     │
+    │                 │          ◄── power    │
+    │                 │              supply   │
+    └─────────────────┼──────────────────────┘
+                      │
+                      │ micro USB ──► USB-A cable
+                      │
+               ┌──────┴──────────────────────┐
+               │    Titan Press Brake         │
+               │    USB-A Port                │
+               │                              │
+               │    (sees removable USB drive) │
+               └──────────────────────────────┘
+    </pre>
+
+    <div class="callout warning">
+        <p><strong>Important:</strong> The Pi needs <em>two</em> cables &mdash; one for data (to Titan) and one for power. The Titan&rsquo;s USB port may not supply enough power to run the Pi reliably. Always use a separate power supply.</p>
+    </div>
+
+
+    <!-- ======== FIND THE IP ======== -->
+    <h2 id="titan-find-ip">Step 4: Find the Pi&rsquo;s IP Address</h2>
+
+    <p>You need the Pi&rsquo;s network address to connect BendGen to it. There are several ways to find it:</p>
+
+    <h3>Option A: Use the hostname (easiest)</h3>
+    <p>If you set the hostname to <code>bendgen-bridge</code> during setup, try:</p>
+    <pre style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin:8px 0;font-size:13px;color:var(--accent)">ping bendgen-bridge.local</pre>
+    <p>If it responds, your bridge address is <code>bendgen-bridge.local:8080</code></p>
+
+    <h3>Option B: Check your router</h3>
+    <p>Log into your WiFi router&rsquo;s admin page (usually <code>192.168.1.1</code> or <code>192.168.0.1</code>). Look for connected devices &mdash; find the one named <code>bendgen-bridge</code> and note its IP address.</p>
+
+    <h3>Option C: SSH and check</h3>
+    <p>If you can SSH into the Pi, run:</p>
+    <pre style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin:8px 0;font-size:13px;color:var(--accent)">hostname -I</pre>
+    <p>This prints the Pi&rsquo;s IP address (e.g., <code>192.168.1.42</code>). Your bridge address would be <code>192.168.1.42:8080</code>.</p>
+
+    <h3>Option D: Network scan</h3>
+    <p>From your computer, scan the local network:</p>
+    <pre style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin:8px 0;font-size:13px;color:var(--accent)"># macOS / Linux:
+ping -c1 bendgen-bridge.local
+
+# Windows:
+ping bendgen-bridge.local</pre>
+
+    <div class="callout">
+        <p><strong>Static IP (recommended for permanent installs):</strong> To prevent the IP from changing, assign a static IP on your router (DHCP reservation) or configure it on the Pi itself. This way the bridge address never changes.</p>
+    </div>
+
+
+    <!-- ======== CONNECT BENDGEN ======== -->
+    <h2 id="titan-connect-bendgen">Step 5: Connect BendGen to the Bridge</h2>
+
+    <div class="steps">
+        <div class="step">
+            <div class="step-body">
+                <strong>Open BendGen</strong> on your computer (any computer on the same network as the Pi).
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Click &ldquo;Deploy&rdquo;</strong> in the Titan section of the header. Since no bridge address is saved yet, a settings dialog opens.
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Enter the bridge address</strong> &mdash; either <code>bendgen-bridge.local:8080</code> or the IP address (e.g., <code>192.168.1.42:8080</code>).
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Click &ldquo;Test Connection&rdquo;</strong> to verify. You should see:
+                <ul style="margin-top:6px">
+                    <li><span style="color:var(--success)">Connected &mdash; gadget active</span> = everything is working</li>
+                    <li><span style="color:var(--warn)">Connected &mdash; gadget not active</span> = Pi is reachable but USB cable may not be connected, or gadget service didn&rsquo;t start</li>
+                    <li><span style="color:var(--danger)">Cannot reach bridge</span> = wrong address, Pi is off, or not on same network</li>
+                </ul>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-body">
+                <strong>Click &ldquo;Save&rdquo;</strong>. The address is stored in your browser and persists across sessions.
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ======== DEPLOY & IMPORT ======== -->
+    <h2 id="titan-deploy">Deploying &amp; Importing via the Bridge</h2>
+
+    <h3>Deploying to Titan (BendGen &rarr; Titan)</h3>
+    <ol>
+        <li>Create or edit your program in BendGen as usual.</li>
+        <li>Click <kbd>Deploy</kbd> in the Titan section of the header.</li>
+        <li>BendGen generates the backup ZIP, sends it to the Pi, and the Pi writes it to the virtual USB drive.</li>
+        <li>The Titan sees a freshly inserted USB drive with your file.</li>
+        <li>On the Titan touchscreen, tap <strong>Backup/Restore</strong> (&#x23F3;) &rarr; <strong>Restore From</strong> &rarr; select the ZIP.</li>
+    </ol>
+
+    <h3>Importing from Titan (Titan &rarr; BendGen)</h3>
+    <ol>
+        <li>On the Titan touchscreen, create a backup to the USB drive (tap &#x23F3; &rarr; enter a name &rarr; <strong>Create Backup</strong>).</li>
+        <li>In BendGen, click <kbd>Get Backup</kbd> in the Titan section of the header.</li>
+        <li>A list of files on the USB drive appears. Click <strong>Import</strong> on the one you want.</li>
+        <li>The backup is downloaded from the Pi and loaded into BendGen &mdash; all programs and bends appear in the editor.</li>
+    </ol>
+
+    <div class="callout">
+        <p><strong>Tip:</strong> The deploy cycle takes about 1&ndash;2 seconds. During that time the Titan briefly sees the USB drive disappear and reappear &mdash; this is normal. Wait for the &ldquo;Deployed&rdquo; confirmation in BendGen before touching the Titan.</p>
+    </div>
+
+
+    <!-- ======== BRIDGE TROUBLESHOOTING ======== -->
+    <h2 id="titan-troubleshooting">Bridge Troubleshooting</h2>
+
+    <h3>BendGen says &ldquo;Cannot reach bridge&rdquo;</h3>
+    <ul>
+        <li>Make sure the Pi is powered on and connected to WiFi.</li>
+        <li>Verify the address &mdash; try pinging <code>bendgen-bridge.local</code> from your computer.</li>
+        <li>Make sure your computer and the Pi are on the <strong>same WiFi network</strong>.</li>
+        <li>Try using the IP address instead of the hostname (e.g., <code>192.168.1.42:8080</code>).</li>
+        <li>SSH into the Pi and check the service: <code>sudo systemctl status usb-bridge</code></li>
+    </ul>
+
+    <h3>Test says &ldquo;gadget not active&rdquo;</h3>
+    <ul>
+        <li>Check that the USB data cable is connected to the Pi&rsquo;s <strong>center port</strong> (USB DATA), not the edge port (PWR).</li>
+        <li>Make sure the cable is a <strong>data cable</strong>, not a charge-only cable. Charge-only cables have no data wires.</li>
+        <li>Check the gadget service: <code>sudo systemctl status usb-gadget</code></li>
+        <li>Check that <code>dwc2</code> is loaded: <code>lsmod | grep dwc2</code></li>
+    </ul>
+
+    <h3>Titan doesn&rsquo;t see the USB drive</h3>
+    <ul>
+        <li>Try a different USB cable &mdash; some cables are power-only.</li>
+        <li>Try a different USB port on the Titan.</li>
+        <li>SSH into the Pi and check: <code>cat /sys/kernel/config/usb_gadget/g1/UDC</code> &mdash; it should show a device controller name.</li>
+        <li>Reboot the Pi with the USB cable connected.</li>
+    </ul>
+
+    <h3>Deploy succeeds but Titan doesn&rsquo;t see the file</h3>
+    <ul>
+        <li>On the Titan, use <strong>Restore From</strong> (folder icon at bottom of backup popup) &mdash; not the regular backup list.</li>
+        <li>The file may be there but you need to browse to the root of the USB drive.</li>
+    </ul>
+
+    <h3>Pi loses WiFi or IP changes</h3>
+    <ul>
+        <li>Set a <strong>static IP reservation</strong> on your router for the Pi&rsquo;s MAC address. This prevents the IP from changing.</li>
+        <li>Alternatively, always use the hostname <code>bendgen-bridge.local</code> instead of the IP.</li>
+    </ul>
+
+    <h3>Checking logs</h3>
+    <p>SSH into the Pi and run:</p>
+    <pre style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin:8px 0;font-size:13px;color:var(--accent)"># Bridge API logs:
+journalctl -u usb-bridge -f
+
+# Gadget setup logs:
+journalctl -u usb-gadget</pre>
 
 
     <!-- ======== BENDCONTROLLER OVERVIEW ======== -->

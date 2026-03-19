@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadTooling();
     await loadPrograms();
     wireEvents();
+    wireCustomTooltips();
 });
 
 async function loadTooling() {
@@ -48,6 +49,8 @@ function wireEvents() {
     document.getElementById("saveProgramBtn").addEventListener("click", saveProgram);
     document.getElementById("deleteProgramBtn").addEventListener("click", deleteProgram);
     document.getElementById("exportBtn").addEventListener("click", exportZip);
+    document.getElementById("deployBtn").addEventListener("click", deployToTitan);
+    document.getElementById("importFromTitanBtn").addEventListener("click", importFromTitan);
     document.getElementById("resetBtn").addEventListener("click", resetAll);
     document.getElementById("importFile").addEventListener("change", importBackup);
     document.getElementById("importDxfFile").addEventListener("change", importDxf);
@@ -67,6 +70,28 @@ function wireEvents() {
         if (e.target.id === "dxfPreviewModal") closeDxfPreview();
     });
     wireDxfResizeHandle();
+    wireAccordions();
+}
+
+// --- Sidebar accordions ---
+function wireAccordions() {
+    document.querySelectorAll(".panel-accordion-toggle").forEach(toggle => {
+        toggle.addEventListener("click", () => {
+            const isActive = toggle.classList.contains("active");
+            // Close all
+            document.querySelectorAll(".panel-accordion-toggle").forEach(t => {
+                t.classList.remove("active");
+                const body = t.closest(".panel-accordion").querySelector(".panel-accordion-body");
+                if (body) body.classList.add("hidden");
+            });
+            // Open clicked one (unless it was already open)
+            if (!isActive) {
+                toggle.classList.add("active");
+                const body = toggle.closest(".panel-accordion").querySelector(".panel-accordion-body");
+                if (body) body.classList.remove("hidden");
+            }
+        });
+    });
 }
 
 // --- DXF split pane resize ---
@@ -130,6 +155,9 @@ function switchUnit(unit) {
     if (currentView === "table") {
         renderTableFromForm();
     }
+
+    // Re-render gauge grid if the tooling modal is open
+    reRenderGaugeGridForUnit();
 }
 
 function updateLinearMinMax(input) {
@@ -215,12 +243,72 @@ function renderProgramList(programs, bends) {
         li.dataset.id = p.id;
         if (p.id === currentProgramId) li.classList.add("active");
         li.innerHTML = `
-            <div class="prog-name">${escHtml(p.name || "Untitled")}</div>
-            <div class="prog-info">${p.bendIds.length} bend${p.bendIds.length !== 1 ? "s" : ""}</div>
+            <div class="prog-main">
+                <div class="prog-name">${escHtml(p.name || "Untitled")}</div>
+                <div class="prog-info">${p.bendIds.length} bend${p.bendIds.length !== 1 ? "s" : ""}</div>
+            </div>
+            <div class="prog-actions">
+                <button class="prog-action-btn prog-dup-btn" title="Duplicate this program">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                </button>
+                <button class="prog-action-btn prog-del-btn" title="Delete this program">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+                </button>
+            </div>
         `;
-        li.addEventListener("click", () => selectProgram(p.id));
+        li.querySelector(".prog-main").addEventListener("click", () => selectProgram(p.id));
+        li.querySelector(".prog-dup-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            duplicateProgramById(p.id);
+        });
+        li.querySelector(".prog-del-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            deleteProgramById(p.id, p.name);
+        });
         list.appendChild(li);
     });
+}
+
+async function duplicateProgramById(programId) {
+    const resp = await fetch("/api/programs");
+    const data = await resp.json();
+    const program = data.programs.find(p => p.id === programId);
+    if (!program) return;
+
+    const programBends = program.bendIds.map(bid => {
+        const bend = data.bends.find(b => b.id === bid);
+        if (!bend) return null;
+        const copy = { ...bend };
+        copy.id = crypto.randomUUID();
+        return copy;
+    }).filter(Boolean);
+
+    const saveResp = await fetch("/api/program", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            name: program.name + " (Copy)",
+            bends: programBends,
+        }),
+    });
+    const result = await saveResp.json();
+    if (result.ok) {
+        await loadPrograms();
+        showStatus(`Duplicated "${program.name}"`, "success");
+    }
+}
+
+async function deleteProgramById(programId, programName) {
+    if (!confirm(`Delete "${programName || "Untitled"}" and its bends?`)) return;
+    await fetch(`/api/program/${programId}`, { method: "DELETE" });
+    if (currentProgramId === programId) {
+        currentProgramId = null;
+        document.getElementById("programEditor").classList.add("hidden");
+        document.getElementById("noSelection").classList.remove("hidden");
+        document.getElementById("bendTable").innerHTML = "";
+    }
+    await loadPrograms();
+    showStatus("Program deleted", "info");
 }
 
 async function selectProgram(programId) {
@@ -2170,14 +2258,32 @@ async function deletePunch(punchId) {
 function renderMaterialList() {
     const list = document.getElementById("materialList");
     list.innerHTML = "";
+    const isMm = currentUnit === "mm";
+    const unitLabel = isMm ? "mm" : "in";
     tooling.materials.forEach(mat => {
-        const gaugeCount = mat.gaugeThickness ? Object.keys(mat.gaugeThickness).length : 0;
+        const gt = mat.gaugeThickness || {};
+        const gaugeKeys = Object.keys(gt).map(Number).sort((a, b) => a - b);
+
+        // Build a compact gauge summary showing common gauges
+        let gaugeSummary = "";
+        if (gaugeKeys.length > 0) {
+            const samples = gaugeKeys.filter(g => [10, 12, 14, 16, 18, 20, 22, 24].includes(g));
+            const display = (samples.length > 0 ? samples : gaugeKeys.slice(0, 6));
+            gaugeSummary = display.map(g => {
+                let t = gt[g] || gt[String(g)];
+                if (isMm) t = +(t * MM_PER_INCH).toFixed(2);
+                else t = +t.toFixed(4);
+                return `${g}ga=${t}`;
+            }).join("  ");
+        }
+
         const row = document.createElement("div");
         row.className = "tooling-item" + (mat.stock ? " stock" : "");
         row.innerHTML = `
             <div class="tooling-item-info">
                 <span class="tooling-item-name">${escHtml(mat.name)}</span>
-                <span class="tooling-item-detail">Tensile: ${mat.materialTensileStrengthPsi.toLocaleString()} PSI | Springback: ${mat.materialSpringback}${gaugeCount ? ` | ${gaugeCount} gauges` : ""}</span>
+                <span class="tooling-item-detail">Tensile: ${mat.materialTensileStrengthPsi.toLocaleString()} PSI | Springback: ${mat.materialSpringback}</span>
+                ${gaugeSummary ? `<span class="tooling-item-gauges" title="Gauge thicknesses in ${unitLabel}">${gaugeSummary}</span>` : ""}
             </div>
             <div class="tooling-item-actions">
                 ${mat.stock ? '<span class="stock-badge">Stock</span>' : ''}
@@ -2205,13 +2311,8 @@ async function saveMaterial() {
     if (isNaN(insideRadiusRuleOfThumb)) { showStatus("Inside radius rule of thumb is required", "error"); return; }
     if (isNaN(materialSpringback)) { showStatus("Springback is required", "error"); return; }
 
-    // Collect gauge/thickness from grid
-    const gaugeThickness = {};
-    document.querySelectorAll("#gaugeGrid .gauge-entry input").forEach(inp => {
-        const ga = inp.dataset.gauge;
-        const val = parseFloat(inp.value);
-        if (ga && !isNaN(val) && val > 0) gaugeThickness[ga] = val;
-    });
+    // Gauge data is already in inches in _editGaugeData
+    const gaugeThickness = { ..._editGaugeData };
 
     const body = { name, materialTensileStrengthPsi, insideRadiusRuleOfThumb, materialSpringback, gaugeThickness };
     if (editId) body.id = editId;
@@ -2272,17 +2373,90 @@ async function deleteMaterial(matId) {
 
 // --- Gauge grid for material editing ---
 
+// In-memory gauge data for the material being edited (always stored in inches)
+let _editGaugeData = {};
+
 function renderGaugeGrid(gaugeThickness) {
-    const grid = document.getElementById("gaugeGrid");
-    let html = "";
-    for (let ga = 7; ga <= 28; ga++) {
-        const val = gaugeThickness[String(ga)] || gaugeThickness[ga] || "";
-        html += `<div class="gauge-entry">
-            <label>${ga} ga</label>
-            <input type="number" step="0.0001" min="0" data-gauge="${ga}" value="${val}" placeholder="—">
-        </div>`;
+    _editGaugeData = {};
+    for (const [k, v] of Object.entries(gaugeThickness || {})) {
+        if (v && parseFloat(v) > 0) _editGaugeData[parseInt(k)] = parseFloat(v);
     }
-    grid.innerHTML = html;
+    renderGaugeTable();
+}
+
+function renderGaugeTable() {
+    const wrap = document.getElementById("gaugeTableWrap");
+    if (!wrap) return;
+    const isMm = currentUnit === "mm";
+    const sorted = Object.keys(_editGaugeData).map(Number).sort((a, b) => a - b);
+
+    let html = '<table class="gauge-table"><tbody>';
+    sorted.forEach(ga => {
+        const inchVal = _editGaugeData[ga];
+        const displayVal = isMm ? +(inchVal * MM_PER_INCH).toFixed(3) : +inchVal.toFixed(4);
+        html += `<tr data-ga="${ga}">
+            <td class="gauge-td-ga">${ga} ga</td>
+            <td class="gauge-td-val">
+                <input type="number" value="${displayVal}" step="${isMm ? '0.001' : '0.0001'}" min="0" class="gauge-inline-input">
+            </td>
+            <td class="gauge-td-del"><button class="gauge-del-btn" title="Remove">×</button></td>
+        </tr>`;
+    });
+    // Always show an empty row at the bottom for adding
+    html += `<tr class="gauge-new-row">
+        <td class="gauge-td-ga">
+            <input type="number" min="1" max="50" step="1" placeholder="ga" class="gauge-inline-input gauge-new-ga">
+        </td>
+        <td class="gauge-td-val">
+            <input type="number" step="${isMm ? '0.001' : '0.0001'}" min="0" placeholder="thickness" class="gauge-inline-input gauge-new-val">
+        </td>
+        <td class="gauge-td-del"><button class="gauge-add-btn btn btn-tiny btn-success" title="Add gauge entry">+</button></td>
+    </tr>`;
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+
+    // Wire inline edits on existing rows
+    wrap.querySelectorAll("tr[data-ga] .gauge-inline-input").forEach(inp => {
+        inp.addEventListener("change", () => {
+            const ga = parseInt(inp.closest("tr").dataset.ga);
+            let val = parseFloat(inp.value);
+            if (isNaN(val) || val <= 0) { delete _editGaugeData[ga]; renderGaugeTable(); return; }
+            if (isMm) val = val / MM_PER_INCH;
+            _editGaugeData[ga] = +val.toFixed(4);
+        });
+    });
+
+    // Wire delete buttons
+    wrap.querySelectorAll(".gauge-del-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const ga = parseInt(btn.closest("tr").dataset.ga);
+            delete _editGaugeData[ga];
+            renderGaugeTable();
+        });
+    });
+
+    // Wire add row
+    const addBtn = wrap.querySelector(".gauge-add-btn");
+    const gaInput = wrap.querySelector(".gauge-new-ga");
+    const valInput = wrap.querySelector(".gauge-new-val");
+
+    function doAdd() {
+        const ga = parseInt(gaInput.value);
+        let thickness = parseFloat(valInput.value);
+        if (isNaN(ga) || ga < 1) return;
+        if (isNaN(thickness) || thickness <= 0) return;
+        if (isMm) thickness = thickness / MM_PER_INCH;
+        _editGaugeData[ga] = +thickness.toFixed(4);
+        renderGaugeTable();
+    }
+
+    addBtn.addEventListener("click", doAdd);
+    gaInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); valInput.focus(); } });
+    valInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doAdd(); } });
+}
+
+function reRenderGaugeGridForUnit() {
+    renderGaugeTable();
 }
 
 // --- Refresh tooling dropdowns in open bend cards ---
@@ -2304,5 +2478,256 @@ function refreshAllToolingDropdowns() {
 
     if (currentView === "table") {
         renderTableFromForm();
+    }
+}
+
+// --- Custom Tooltips ---
+function wireCustomTooltips() {
+    const tip = document.createElement("div");
+    tip.className = "custom-tooltip";
+    document.body.appendChild(tip);
+
+    let showTimeout = null;
+
+    document.addEventListener("mouseover", (e) => {
+        const el = e.target.closest("[title]");
+        if (!el) return;
+        const text = el.getAttribute("title");
+        if (!text) return;
+        // Store and remove native title to prevent double tooltip
+        el.dataset.tip = text;
+        el.removeAttribute("title");
+
+        clearTimeout(showTimeout);
+        showTimeout = setTimeout(() => {
+            tip.textContent = text;
+            tip.classList.add("visible");
+            positionTooltip(tip, el);
+        }, 400);
+    });
+
+    document.addEventListener("mouseout", (e) => {
+        const el = e.target.closest("[data-tip]");
+        if (!el) return;
+        clearTimeout(showTimeout);
+        tip.classList.remove("visible");
+        // Restore title attribute
+        el.setAttribute("title", el.dataset.tip);
+        delete el.dataset.tip;
+    });
+
+    function positionTooltip(tip, el) {
+        const rect = el.getBoundingClientRect();
+        const tipRect = tip.getBoundingClientRect();
+        let top = rect.bottom + 8;
+        let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+
+        // Keep on screen
+        if (left < 8) left = 8;
+        if (left + tipRect.width > window.innerWidth - 8) left = window.innerWidth - tipRect.width - 8;
+        if (top + tipRect.height > window.innerHeight - 8) top = rect.top - tipRect.height - 8;
+
+        tip.style.top = top + "px";
+        tip.style.left = left + "px";
+    }
+}
+
+// --- USB Drive Bridge Integration ---
+
+const BRIDGE_STORAGE_KEY = "bendgen_bridge_address";
+
+function getBridgeUrl() {
+    const addr = localStorage.getItem(BRIDGE_STORAGE_KEY);
+    if (!addr) return null;
+    if (addr.startsWith("http://") || addr.startsWith("https://")) return addr;
+    return "http://" + addr;
+}
+
+function promptBridgeAddress() {
+    document.getElementById("bridgeModal").classList.remove("hidden");
+    const input = document.getElementById("bridgeAddress");
+    input.value = localStorage.getItem(BRIDGE_STORAGE_KEY) || "";
+    input.focus();
+
+    document.getElementById("closeBridgeModal").onclick = () => {
+        document.getElementById("bridgeModal").classList.add("hidden");
+    };
+    document.getElementById("bridgeModal").onclick = (e) => {
+        if (e.target.id === "bridgeModal") document.getElementById("bridgeModal").classList.add("hidden");
+    };
+    document.getElementById("bridgeSaveBtn").onclick = () => {
+        const val = input.value.trim();
+        if (val) {
+            localStorage.setItem(BRIDGE_STORAGE_KEY, val);
+            showStatus("Bridge address saved: " + val, "success");
+        } else {
+            localStorage.removeItem(BRIDGE_STORAGE_KEY);
+            showStatus("Bridge address cleared", "info");
+        }
+        document.getElementById("bridgeModal").classList.add("hidden");
+    };
+    document.getElementById("bridgeTestBtn").onclick = testBridgeConnection;
+}
+
+async function testBridgeConnection() {
+    const input = document.getElementById("bridgeAddress");
+    const result = document.getElementById("bridgeTestResult");
+    const addr = input.value.trim();
+    if (!addr) {
+        result.textContent = "Enter an address first";
+        result.style.color = "var(--warning)";
+        return;
+    }
+    const url = (addr.startsWith("http") ? addr : "http://" + addr);
+    result.textContent = "Testing...";
+    result.style.color = "var(--text-dim)";
+    try {
+        const resp = await fetch(url + "/api/status", { signal: AbortSignal.timeout(5000) });
+        const data = await resp.json();
+        if (data.ok && data.gadget_active) {
+            result.textContent = "Connected — gadget active";
+            result.style.color = "var(--success)";
+        } else if (data.ok) {
+            result.textContent = "Connected — gadget not active (check USB cable)";
+            result.style.color = "var(--warning)";
+        } else {
+            result.textContent = "Bridge responded but reported an error";
+            result.style.color = "var(--warning)";
+        }
+    } catch (e) {
+        result.textContent = "Cannot reach bridge at " + addr;
+        result.style.color = "var(--danger)";
+    }
+}
+
+async function deployToTitan() {
+    const bridgeUrl = getBridgeUrl();
+    if (!bridgeUrl) {
+        promptBridgeAddress();
+        return;
+    }
+
+    if (currentView === "table") syncFormFromTable();
+
+    showStatus("Deploying to Titan...", "info");
+
+    try {
+        // Get the ZIP from BendGen
+        const exportResp = await fetch("/api/export", { method: "POST" });
+        if (!exportResp.ok) {
+            showStatus("Export failed", "error");
+            return;
+        }
+        const blob = await exportResp.blob();
+        const cd = exportResp.headers.get("Content-Disposition") || "";
+        const fnMatch = cd.match(/filename=([^\s;]+)/);
+        const filename = fnMatch ? fnMatch[1] : _makeBendControlFilename();
+
+        // Send to bridge
+        const formData = new FormData();
+        formData.append("file", blob, filename);
+
+        const deployResp = await fetch(bridgeUrl + "/api/deploy", {
+            method: "POST",
+            body: formData,
+        });
+        const deployResult = await deployResp.json();
+
+        if (deployResult.ok) {
+            showStatus("Deployed to Titan! Use 'Restore From' on the press brake to load.", "success");
+        } else {
+            showStatus("Deploy failed: " + (deployResult.error || "Unknown error"), "error");
+        }
+    } catch (e) {
+        if (e.name === "TypeError" && e.message.includes("fetch")) {
+            showStatus("Cannot reach bridge — check address in settings", "error");
+            promptBridgeAddress();
+        } else {
+            showStatus("Deploy failed: " + e.message, "error");
+        }
+    }
+}
+
+async function importFromTitan() {
+    const bridgeUrl = getBridgeUrl();
+    if (!bridgeUrl) {
+        promptBridgeAddress();
+        return;
+    }
+
+    showStatus("Checking Titan USB drive...", "info");
+
+    try {
+        const resp = await fetch(bridgeUrl + "/api/backups", { signal: AbortSignal.timeout(10000) });
+        const data = await resp.json();
+
+        if (!data.ok) {
+            showStatus("Failed to read USB drive: " + (data.error || "Unknown error"), "error");
+            return;
+        }
+
+        if (data.files.length === 0) {
+            showStatus("No files found on Titan USB drive", "info");
+            return;
+        }
+
+        // Show the bridge modal with the file listing
+        document.getElementById("bridgeModal").classList.remove("hidden");
+        document.getElementById("bridgeAddress").value = localStorage.getItem(BRIDGE_STORAGE_KEY) || "";
+        const listDiv = document.getElementById("bridgeBackupsList");
+        const contentDiv = document.getElementById("bridgeBackupsContent");
+        listDiv.classList.remove("hidden");
+
+        contentDiv.innerHTML = data.files.map(f => {
+            const sizeKB = Math.round(f.size / 1024);
+            const date = new Date(f.modified * 1000).toLocaleString();
+            return `<div class="tooling-item" style="padding:8px 12px">
+                <div class="tooling-item-info">
+                    <span class="tooling-item-name">${escHtml(f.name)}</span>
+                    <span class="tooling-item-detail">${sizeKB} KB — ${date}</span>
+                </div>
+                <div class="tooling-item-actions">
+                    <button class="btn btn-tiny btn-primary bridge-import-btn" data-filename="${escHtml(f.name)}">Import</button>
+                </div>
+            </div>`;
+        }).join("");
+
+        // Wire import buttons
+        contentDiv.querySelectorAll(".bridge-import-btn").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const filename = btn.dataset.filename;
+                showStatus("Downloading " + filename + " from Titan...", "info");
+                try {
+                    const dlResp = await fetch(bridgeUrl + "/api/backup/" + encodeURIComponent(filename));
+                    if (!dlResp.ok) throw new Error("Download failed");
+                    const zipBlob = await dlResp.blob();
+
+                    // Send to BendGen import endpoint
+                    const importForm = new FormData();
+                    importForm.append("file", zipBlob, filename);
+                    const importResp = await fetch("/api/import", { method: "POST", body: importForm });
+                    const importResult = await importResp.json();
+
+                    if (importResult.ok) {
+                        document.getElementById("bridgeModal").classList.add("hidden");
+                        await loadTooling();
+                        await loadPrograms();
+                        showStatus(`Imported from Titan: ${importResult.counts.programs} programs, ${importResult.counts.bends} bends`, "success");
+                    } else {
+                        showStatus("Import failed: " + (importResult.error || "Unknown error"), "error");
+                    }
+                } catch (e) {
+                    showStatus("Import failed: " + e.message, "error");
+                }
+            });
+        });
+
+    } catch (e) {
+        if (e.name === "TypeError" || e.name === "AbortError") {
+            showStatus("Cannot reach bridge — check address in settings", "error");
+            promptBridgeAddress();
+        } else {
+            showStatus("Error: " + e.message, "error");
+        }
     }
 }
