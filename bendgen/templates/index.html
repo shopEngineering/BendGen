@@ -21,11 +21,12 @@
                     BendGen
                 </h1>
                 <p class="subtitle">Bend Program Generator for Langmuir BendControl</p>
+                <span class="version-label" id="versionLabel" title="Current version">v{{ version }}</span>
             </div>
             <div class="header-utils">
                 <button class="btn btn-teal btn-small" id="manageToolingBtn" title="Add, edit, or remove custom dies, punches, and materials">Manage Tooling</button>
+                <button class="btn btn-secondary btn-small" id="checkUpdateBtn" title="Check GitHub for a newer version of BendGen">Check for Updates</button>
                 <a href="/help" target="_blank" class="btn btn-secondary btn-small" id="helpBtn" title="Open the help guide in a new tab">Help</a>
-                <button class="btn btn-danger btn-small" id="resetBtn" title="Erase all programs, bends, and custom tooling — return to factory defaults">Reset All</button>
             </div>
         </div>
     </header>
@@ -70,6 +71,9 @@
                 </div>
             </div>
             <ul id="programList" class="program-list"></ul>
+            <div class="panel-footer">
+                <button class="btn btn-danger btn-small" id="resetBtn" title="Erase all programs, bends, and custom tooling — return to factory defaults">Reset All</button>
+            </div>
         </section>
         <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">&lsaquo;</button>
 

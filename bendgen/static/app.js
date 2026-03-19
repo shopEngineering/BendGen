@@ -52,6 +52,7 @@ function wireEvents() {
     document.getElementById("deployBtn").addEventListener("click", deployToTitan);
     document.getElementById("importFromTitanBtn").addEventListener("click", importFromTitan);
     document.getElementById("resetBtn").addEventListener("click", resetAll);
+    document.getElementById("checkUpdateBtn").addEventListener("click", checkForUpdates);
     document.getElementById("importFile").addEventListener("change", importBackup);
     document.getElementById("importDxfFile").addEventListener("change", importDxf);
     const importImageEl = document.getElementById("importImageFile");
@@ -2478,6 +2479,49 @@ function refreshAllToolingDropdowns() {
 
     if (currentView === "table") {
         renderTableFromForm();
+    }
+}
+
+// --- Check for Updates ---
+async function checkForUpdates() {
+    const btn = document.getElementById("checkUpdateBtn");
+    const currentVersion = document.getElementById("versionLabel")?.textContent?.replace("v", "").trim();
+    btn.textContent = "Checking...";
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch("https://api.github.com/repos/shopEngineering/BendGen/releases/latest", {
+            signal: AbortSignal.timeout(8000),
+        });
+        if (!resp.ok) throw new Error("GitHub API error");
+        const release = await resp.json();
+        const latestVersion = (release.tag_name || "").replace("v", "");
+
+        if (!currentVersion || !latestVersion) {
+            showStatus("Could not determine version info", "error");
+        } else if (latestVersion !== currentVersion) {
+            // Find download links
+            const assets = (release.assets || []).map(a => a.browser_download_url);
+            const msg = `Update available: v${latestVersion} (you have v${currentVersion})`;
+            showStatus(msg, "info");
+            btn.textContent = "v" + latestVersion + " Available";
+            btn.classList.remove("btn-secondary");
+            btn.classList.add("btn-success");
+            btn.onclick = () => window.open(release.html_url, "_blank");
+            btn.disabled = false;
+            btn.title = "Click to open the download page";
+        } else {
+            showStatus("You're on the latest version (v" + currentVersion + ")", "success");
+            btn.textContent = "Up to Date";
+            setTimeout(() => {
+                btn.textContent = "Check for Updates";
+                btn.disabled = false;
+            }, 5000);
+        }
+    } catch (e) {
+        showStatus("Could not check for updates — are you online?", "error");
+        btn.textContent = "Check for Updates";
+        btn.disabled = false;
     }
 }
 

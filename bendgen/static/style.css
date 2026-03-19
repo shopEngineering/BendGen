@@ -67,6 +67,14 @@ header {
 header h1 { color: var(--accent); font-size: 24px; display: flex; align-items: center; gap: 8px; }
 .logo { flex-shrink: 0; }
 .subtitle { color: var(--text-dim); font-size: 14px; }
+.version-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'SF Mono', Consolas, monospace;
+}
 .header-utils {
     display: flex;
     align-items: center;
@@ -154,6 +162,13 @@ main {
 .sidebar-toggle.collapsed {
     border-left: 1px solid var(--border);
 }
+.panel-footer {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+}
+.panel-footer .btn { width: 100%; opacity: 0.6; }
+.panel-footer .btn:hover { opacity: 1; }
 .panel-accordion {
     border-bottom: 1px solid var(--border);
 }

@@ -21,6 +21,7 @@ from .dxf_analyzer import analyze_dxf, analysis_to_bend_dicts, analysis_to_summa
 from .image_analyzer import analyze_image, has_ocr
 
 app = Flask(__name__)
+VERSION = "1.3.0"
 
 # --- Local persistence ---
 _DATA_DIR = Path.home() / ".bendgen"
@@ -136,7 +137,12 @@ def _reset_state():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", version=VERSION)
+
+
+@app.route("/api/version")
+def get_version():
+    return jsonify({"version": VERSION})
 
 
 @app.route("/help")
