@@ -386,6 +386,24 @@
         </div>
     </div>
 
+    <!-- Update Available Modal -->
+    <div id="updateModal" class="modal-overlay hidden">
+        <div class="modal" style="max-width:640px">
+            <div class="modal-header">
+                <h2 id="updateModalTitle">Update Available</h2>
+                <button class="btn btn-tiny btn-secondary" id="closeUpdateModal">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:16px">
+                <p id="updateVersionLine" style="margin:0 0 12px 0;color:var(--text-dim);font-size:13px"></p>
+                <div id="updateReleaseNotes" style="max-height:360px;overflow:auto;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:13px;line-height:1.5"></div>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:14px">
+                    <button class="btn btn-small btn-primary" id="updateDownloadBtn">Download</button>
+                    <button class="btn btn-small btn-secondary" id="updateCloseBtn">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Deploy Name Modal -->
     <div id="deployNameModal" class="modal-overlay hidden">
         <div class="modal" style="max-width:440px">

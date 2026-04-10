@@ -2483,6 +2483,132 @@ function refreshAllToolingDropdowns() {
 }
 
 // --- Check for Updates ---
+
+// Parse inline markdown (`code`, **bold**, [text](http(s)://url)) into DOM nodes.
+// Returns an array of Node objects, never HTML strings.
+function _parseInlineMarkdown(s) {
+    const nodes = [];
+    let buf = "";
+    const flush = () => { if (buf) { nodes.push(document.createTextNode(buf)); buf = ""; } };
+    let i = 0;
+    while (i < s.length) {
+        // [text](url)
+        if (s[i] === "[") {
+            const closeText = s.indexOf("]", i);
+            if (closeText !== -1 && s[closeText + 1] === "(") {
+                const closeUrl = s.indexOf(")", closeText + 2);
+                if (closeUrl !== -1) {
+                    const text = s.slice(i + 1, closeText);
+                    const url = s.slice(closeText + 2, closeUrl);
+                    if (/^https?:\/\//i.test(url)) {
+                        flush();
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.target = "_blank";
+                        a.rel = "noopener noreferrer";
+                        a.textContent = text;
+                        nodes.push(a);
+                        i = closeUrl + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        // `code`
+        if (s[i] === "`") {
+            const close = s.indexOf("`", i + 1);
+            if (close !== -1) {
+                flush();
+                const code = document.createElement("code");
+                code.textContent = s.slice(i + 1, close);
+                nodes.push(code);
+                i = close + 1;
+                continue;
+            }
+        }
+        // **bold**
+        if (s[i] === "*" && s[i + 1] === "*") {
+            const close = s.indexOf("**", i + 2);
+            if (close !== -1) {
+                flush();
+                const strong = document.createElement("strong");
+                strong.textContent = s.slice(i + 2, close);
+                nodes.push(strong);
+                i = close + 2;
+                continue;
+            }
+        }
+        buf += s[i];
+        i++;
+    }
+    flush();
+    return nodes;
+}
+
+// Render GitHub release-notes markdown into `target` element using only
+// safe DOM APIs (textContent / createElement / href). No innerHTML.
+// Handles ## / ### headers, * / - bullets, **bold**, `code`, links.
+function _renderReleaseNotesInto(target, md) {
+    while (target.firstChild) target.removeChild(target.firstChild);
+    if (!md || !md.trim()) {
+        const p = document.createElement("p");
+        p.style.cssText = "color:var(--text-dim);margin:0";
+        p.textContent = "No release notes available.";
+        target.appendChild(p);
+        return;
+    }
+    const appendBlock = (tag, text, css) => {
+        const el = document.createElement(tag);
+        if (css) el.style.cssText = css;
+        _parseInlineMarkdown(text).forEach((n) => el.appendChild(n));
+        target.appendChild(el);
+    };
+    const lines = md.split("\n");
+    let currentList = null;
+    const closeList = () => { currentList = null; };
+    for (const raw of lines) {
+        const line = raw.replace(/\r$/, "");
+        if (/^### /.test(line))      { closeList(); appendBlock("h4", line.slice(4), "margin:10px 0 4px"); }
+        else if (/^## /.test(line))  { closeList(); appendBlock("h3", line.slice(3), "margin:12px 0 6px"); }
+        else if (/^# /.test(line))   { closeList(); appendBlock("h3", line.slice(2), "margin:12px 0 6px"); }
+        else if (/^\s*[*-]\s+/.test(line)) {
+            if (!currentList) {
+                currentList = document.createElement("ul");
+                currentList.style.cssText = "margin:4px 0 8px 18px;padding:0";
+                target.appendChild(currentList);
+            }
+            const li = document.createElement("li");
+            _parseInlineMarkdown(line.replace(/^\s*[*-]\s+/, "")).forEach((n) => li.appendChild(n));
+            currentList.appendChild(li);
+        }
+        else if (line.trim() === "") { closeList(); }
+        else                          { closeList(); appendBlock("p", line, "margin:6px 0"); }
+    }
+}
+
+function _showUpdateModal({ title, versionLine, markdown, downloadUrl, showDownload }) {
+    const modal = document.getElementById("updateModal");
+    document.getElementById("updateModalTitle").textContent = title;
+    document.getElementById("updateVersionLine").textContent = versionLine;
+    _renderReleaseNotesInto(document.getElementById("updateReleaseNotes"), markdown);
+
+    const dlBtn = document.getElementById("updateDownloadBtn");
+    if (showDownload && downloadUrl) {
+        dlBtn.style.display = "";
+        dlBtn.onclick = () => window.open(downloadUrl, "_blank");
+    } else {
+        dlBtn.style.display = "none";
+        dlBtn.onclick = null;
+    }
+
+    const close = () => modal.classList.add("hidden");
+    document.getElementById("closeUpdateModal").onclick = close;
+    document.getElementById("updateCloseBtn").onclick = close;
+    modal.onclick = (e) => { if (e.target.id === "updateModal") close(); };
+
+    modal.classList.remove("hidden");
+}
+
 async function checkForUpdates() {
     const btn = document.getElementById("checkUpdateBtn");
     const currentVersion = document.getElementById("versionLabel")?.textContent?.replace("v", "").trim();
@@ -2496,22 +2622,40 @@ async function checkForUpdates() {
         if (!resp.ok) throw new Error("GitHub API error");
         const release = await resp.json();
         const latestVersion = (release.tag_name || "").replace("v", "");
+        const notesMd = release.body || "";
 
         if (!currentVersion || !latestVersion) {
             showStatus("Could not determine version info", "error");
-        } else if (latestVersion !== currentVersion) {
-            // Find download links
-            const assets = (release.assets || []).map(a => a.browser_download_url);
-            const msg = `Update available: v${latestVersion} (you have v${currentVersion})`;
-            showStatus(msg, "info");
+            btn.textContent = "Check for Updates";
+            btn.disabled = false;
+            return;
+        }
+
+        if (latestVersion !== currentVersion) {
+            // Update available — show release notes and a Download button
+            const showIt = () => _showUpdateModal({
+                title: "Update Available: v" + latestVersion,
+                versionLine: "You're on v" + currentVersion + ". Latest is v" + latestVersion + ".",
+                markdown: notesMd,
+                downloadUrl: release.html_url,
+                showDownload: true,
+            });
+            showIt();
             btn.textContent = "v" + latestVersion + " Available";
             btn.classList.remove("btn-secondary");
             btn.classList.add("btn-success");
-            btn.onclick = () => window.open(release.html_url, "_blank");
+            btn.title = "Click to view release notes and download";
             btn.disabled = false;
-            btn.title = "Click to open the download page";
+            btn.onclick = showIt;
         } else {
-            showStatus("You're on the latest version (v" + currentVersion + ")", "success");
+            // Up to date — show what's new in the current release anyway
+            _showUpdateModal({
+                title: "You're up to date — v" + currentVersion,
+                versionLine: "What's new in this version:",
+                markdown: notesMd,
+                downloadUrl: null,
+                showDownload: false,
+            });
             btn.textContent = "Up to Date";
             setTimeout(() => {
                 btn.textContent = "Check for Updates";
