@@ -687,7 +687,13 @@ def import_backup():
 
 @app.route("/api/export", methods=["POST"])
 def export_zip():
-    """Generate and download a backup ZIP with all current data."""
+    """Generate and download a backup ZIP with all current data.
+
+    Accepts an optional ?name=<text> query arg. The name becomes the
+    <name> portion of the BendControl filename B<yyMMddHHmm><name>.zip,
+    which is what the press brake's restore list shows the user.
+    """
+    name = (request.args.get("name") or "").strip()
     zip_bytes = generate_zip(
         _state["bends"],
         _state["programs"],
@@ -695,7 +701,7 @@ def export_zip():
         _state["punches"],
         _state["materials"],
     )
-    filename = make_backup_filename()
+    filename = make_backup_filename(name) if name else make_backup_filename()
     return send_file(
         BytesIO(zip_bytes),
         mimetype="application/zip",

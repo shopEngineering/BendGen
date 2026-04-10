@@ -2644,6 +2644,65 @@ async function testBridgeConnection() {
     }
 }
 
+const DEPLOY_NAME_STORAGE_KEY = "bendgen_deploy_name";
+const DEPLOY_NAME_DEFAULT = "bendgen";
+
+function sanitizeDeployName(s) {
+    return (s || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 30);
+}
+
+function _currentDatePrefix() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return (
+        String(d.getFullYear()).slice(2) +
+        pad(d.getMonth() + 1) +
+        pad(d.getDate()) +
+        pad(d.getHours()) +
+        pad(d.getMinutes())
+    );
+}
+
+function promptDeployName(onConfirm) {
+    const modal = document.getElementById("deployNameModal");
+    const input = document.getElementById("deployNameInput");
+    const preview = document.getElementById("deployFilenamePreview");
+
+    // Default to the last-used name, falling back to DEPLOY_NAME_DEFAULT
+    input.value = localStorage.getItem(DEPLOY_NAME_STORAGE_KEY) || DEPLOY_NAME_DEFAULT;
+
+    const updatePreview = () => {
+        const name = sanitizeDeployName(input.value) || DEPLOY_NAME_DEFAULT;
+        preview.textContent = "Filename: B" + _currentDatePrefix() + name + ".zip";
+    };
+    updatePreview();
+    input.oninput = updatePreview;
+
+    modal.classList.remove("hidden");
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+
+    const close = () => {
+        modal.classList.add("hidden");
+        input.oninput = null;
+        input.onkeydown = null;
+    };
+    const confirm = () => {
+        const name = sanitizeDeployName(input.value) || DEPLOY_NAME_DEFAULT;
+        localStorage.setItem(DEPLOY_NAME_STORAGE_KEY, name);
+        close();
+        onConfirm(name);
+    };
+
+    document.getElementById("deployNameConfirmBtn").onclick = confirm;
+    document.getElementById("deployNameCancelBtn").onclick = close;
+    document.getElementById("closeDeployNameModal").onclick = close;
+    modal.onclick = (e) => { if (e.target.id === "deployNameModal") close(); };
+    input.onkeydown = (e) => {
+        if (e.key === "Enter") { e.preventDefault(); confirm(); }
+        else if (e.key === "Escape") { e.preventDefault(); close(); }
+    };
+}
+
 async function deployToTitan() {
     const bridgeUrl = getBridgeUrl();
     if (!bridgeUrl) {
@@ -2653,11 +2712,18 @@ async function deployToTitan() {
 
     if (currentView === "table") syncFormFromTable();
 
+    promptDeployName((name) => { _performDeploy(bridgeUrl, name); });
+}
+
+async function _performDeploy(bridgeUrl, name) {
     showStatus("Deploying to Titan...", "info");
 
     try {
-        // Get the ZIP from BendGen
-        const exportResp = await fetch("/api/export", { method: "POST" });
+        // Get the ZIP from BendGen with the user's chosen name portion
+        const exportResp = await fetch(
+            "/api/export?name=" + encodeURIComponent(name),
+            { method: "POST" }
+        );
         if (!exportResp.ok) {
             showStatus("Export failed", "error");
             return;
@@ -2678,7 +2744,11 @@ async function deployToTitan() {
         const deployResult = await deployResp.json();
 
         if (deployResult.ok) {
-            showStatus("Deployed to Titan! Use 'Restore From' on the press brake to load.", "success");
+            showStatus(
+                "Deployed to Titan as " + (deployResult.filename || filename) +
+                ". Use 'Restore From' on the press brake to load.",
+                "success"
+            );
         } else {
             showStatus("Deploy failed: " + (deployResult.error || "Unknown error"), "error");
         }

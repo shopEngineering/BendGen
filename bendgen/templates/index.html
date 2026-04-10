@@ -386,6 +386,30 @@
         </div>
     </div>
 
+    <!-- Deploy Name Modal -->
+    <div id="deployNameModal" class="modal-overlay hidden">
+        <div class="modal" style="max-width:440px">
+            <div class="modal-header">
+                <h2>Deploy to Titan</h2>
+                <button class="btn btn-tiny btn-secondary" id="closeDeployNameModal">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:16px">
+                <p style="margin-bottom:12px;color:var(--text-dim);font-size:13px">
+                    Name for this backup. The Titan's restore list shows this name so you can tell backups apart.
+                </p>
+                <div class="field">
+                    <label>Name</label>
+                    <input type="text" id="deployNameInput" placeholder="e.g. jobX_rev2" maxlength="30" autocomplete="off">
+                </div>
+                <p id="deployFilenamePreview" style="margin-top:8px;color:var(--text-dim);font-size:12px;font-family:monospace"></p>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+                    <button class="btn btn-small btn-primary" id="deployNameConfirmBtn">Deploy</button>
+                    <button class="btn btn-small btn-secondary" id="deployNameCancelBtn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bridge Settings Modal -->
     <div id="bridgeModal" class="modal-overlay hidden">
         <div class="modal" style="max-width:480px">
