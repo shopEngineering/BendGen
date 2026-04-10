@@ -504,7 +504,7 @@
     <p>The USB Drive Bridge lets you send bend programs directly from BendGen to the Titan press brake over WiFi &mdash; no USB drive swapping. A Raspberry Pi Zero W (or Zero 2W) plugs into the Titan&rsquo;s USB port and acts as a virtual USB flash drive. BendGen talks to the Pi over your shop network.</p>
 
     <div class="callout">
-        <p><strong>How it works:</strong> The Pi presents itself to the Titan as a regular removable USB drive. When you click <kbd>Deploy</kbd> in BendGen, the Pi briefly &ldquo;ejects&rdquo; the drive, writes your file, and &ldquo;reinserts&rdquo; it. The Titan sees a freshly inserted USB drive with your program on it &mdash; ready to restore.</p>
+        <p><strong>How it works:</strong> The Pi presents itself to the Titan as a regular removable USB drive backed by a FAT32 image file. When you click <kbd>Deploy</kbd> in BendGen, the Pi briefly disconnects the virtual USB device, writes your file into the image, and reconnects &mdash; so the Titan sees the drive &ldquo;unplug&rdquo; and &ldquo;replug&rdquo; with your new program on it, ready to restore.</p>
     </div>
 
     <!-- Architecture diagram (ASCII) -->
@@ -780,9 +780,10 @@ ping bendgen-bridge.local</pre>
     <ol>
         <li>Create or edit your program in BendGen as usual.</li>
         <li>Click <kbd>Deploy</kbd> in the Titan section of the header.</li>
-        <li>BendGen generates the backup ZIP, sends it to the Pi, and the Pi writes it to the virtual USB drive.</li>
+        <li>A small dialog pops up asking for a <strong>name</strong> for this backup. The name shows up in the Titan&rsquo;s restore list so you can tell backups apart &mdash; pick something meaningful like <code>jobX_rev2</code>. Letters, digits, underscores and hyphens only; unsafe characters are stripped. A live preview shows the full filename (<code>B&lt;yyMMddHHmm&gt;&lt;name&gt;.zip</code>) below the input. BendGen remembers your last name so you don&rsquo;t have to retype it.</li>
+        <li>Press <kbd>Enter</kbd> or click <kbd>Deploy</kbd>. BendGen generates the backup ZIP with that name, sends it to the Pi, and the Pi writes it to the virtual USB drive.</li>
         <li>The Titan sees a freshly inserted USB drive with your file.</li>
-        <li>On the Titan touchscreen, tap <strong>Backup/Restore</strong> (&#x23F3;) &rarr; <strong>Restore From</strong> &rarr; select the ZIP.</li>
+        <li>On the Titan touchscreen, tap <strong>Backup/Restore</strong> (&#x23F3;) &rarr; <strong>Restore From</strong> &rarr; select the name you chose.</li>
     </ol>
 
     <h3>Importing from Titan (Titan &rarr; BendGen)</h3>
@@ -794,7 +795,7 @@ ping bendgen-bridge.local</pre>
     </ol>
 
     <div class="callout">
-        <p><strong>Tip:</strong> The deploy cycle takes about 1&ndash;2 seconds. During that time the Titan briefly sees the USB drive disappear and reappear &mdash; this is normal. Wait for the &ldquo;Deployed&rdquo; confirmation in BendGen before touching the Titan.</p>
+        <p><strong>Tip:</strong> The deploy cycle takes about 1&ndash;2 seconds. During that time the Titan briefly sees the USB drive disappear and reappear &mdash; this is normal. Wait for the &ldquo;Deployed&rdquo; confirmation in BendGen (which shows the exact filename) before touching the Titan.</p>
     </div>
 
 
