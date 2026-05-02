@@ -38,12 +38,12 @@ def _parse_bend(d: dict) -> Bend:
             d[field] = str(d[field])
     # dateCreated comes as a GSON string — keep as-is by setting to now
     d.pop("dateCreated", None)
-    # backGaugeJogSpeed — coerce to float
+    # backGaugeJogSpeed — coerce to float; fall back to 100 IPM (the BendControl default)
     if "backGaugeJogSpeed" in d:
         try:
-            d["backGaugeJogSpeed"] = float(d["backGaugeJogSpeed"]) if d["backGaugeJogSpeed"] is not None else 0.0
+            d["backGaugeJogSpeed"] = float(d["backGaugeJogSpeed"]) if d["backGaugeJogSpeed"] is not None else 100.0
         except (ValueError, TypeError):
-            d["backGaugeJogSpeed"] = 0.0
+            d["backGaugeJogSpeed"] = 100.0
     # Strip any unknown fields that our model doesn't expect
     known = set(Bend.model_fields.keys())
     d = {k: v for k, v in d.items() if k in known}

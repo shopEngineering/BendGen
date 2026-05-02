@@ -66,7 +66,7 @@ class Bend(BaseModel):
     backGaugeRefEdgeStopEnabled: bool = False
     backGaugeXPosition: float = 0.0
     backGaugeRPosition: float = 0.0
-    backGaugeJogSpeed: float = 0.0
+    backGaugeJogSpeed: float = 100.0
     xAxisNotes: str = ""
     rAxisNotes: str = ""
     overrideFinalBendPositionEnabled: bool = False

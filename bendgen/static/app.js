@@ -1,6 +1,11 @@
 // BendGen frontend application
 
-let tooling = { dies: [], punches: [], materials: [], limits: {} };
+let tooling = { dies: [], punches: [], materials: [], limits: {}, settings: { default_jog_speed: 100 } };
+
+function defaultJogSpeed() {
+    const v = parseFloat(tooling?.settings?.default_jog_speed);
+    return isNaN(v) ? 100 : v;
+}
 let currentProgramId = null;
 let currentView = "table"; // "form" or "table"
 let currentUnit = "in"; // "in" or "mm"
@@ -357,6 +362,13 @@ function addBendCard(event, existingBend, index) {
 
     card.querySelector(".bend-number").textContent = num;
     card.dataset.bendId = existingBend ? existingBend.id : crypto.randomUUID();
+    // Stash IPM on the dataset as a defense-in-depth fallback for collectBend
+    const jogSpeed = existingBend && existingBend.backGaugeJogSpeed != null && existingBend.backGaugeJogSpeed !== ""
+        ? existingBend.backGaugeJogSpeed : defaultJogSpeed();
+    card.dataset.bgJogSpeed = jogSpeed;
+    // Always write the visible IPM input (template defaults to 100, but the user-set default may differ)
+    const ipmInput = card.querySelector('input[name="backGaugeJogSpeed"]');
+    if (ipmInput) ipmInput.value = jogSpeed;
 
     populateSelect(card.querySelector('[name="dieId"]'), tooling.dies, "id", "name",
         existingBend ? existingBend.dieId : null);
@@ -559,7 +571,12 @@ function collectBendFromCard(card) {
         backGaugeRefEdgeStopEnabled: !!card.querySelector('.bg-toggle')?.checked,
         backGaugeXPosition: lin("backGaugeXPosition", 0),
         backGaugeRPosition: lin("backGaugeRPosition", 0),
-        backGaugeJogSpeed: parseFloat(get("backGaugeJogSpeed")) || 0,
+        backGaugeJogSpeed: (() => {
+            const v = parseFloat(get("backGaugeJogSpeed"));
+            if (!isNaN(v)) return v;
+            const stashed = parseFloat(card.dataset.bgJogSpeed);
+            return isNaN(stashed) ? 100 : stashed;
+        })(),
         overrideFinalBendPositionEnabled: !!card.querySelector('.override-toggle')?.checked,
         overriddenFinalBendPosition: lin("overriddenFinalBendPosition", 0),
         punchId: get("punchId") || null,
@@ -650,6 +667,7 @@ const TABLE_COLUMNS = [
     { key: "punchToMaterialClearance",  label: "Clearance",   type: "number", step: "0.01" },
     { key: "additionalRetractAfterBend",label: "Retract",     type: "number", step: "0.01" },
     { key: "backGaugeRPosition",        label: "BG R",        type: "number", step: "0.001" },
+    { key: "backGaugeJogSpeed",         label: "IPM",         type: "number", step: "1" },
     { key: "backGaugeRefEdgeStop",      label: "BG Ref",      type: "select", options: [
         { value: "G54", label: "G54 - Lower" }, { value: "G55", label: "G55 - Upper" },
         { value: "G56", label: "G56" }, { value: "G57", label: "G57" },
@@ -713,7 +731,7 @@ function makeEmptyBend() {
         backGaugeRefEdgeStopEnabled: false,
         backGaugeXPosition: 0,
         backGaugeRPosition: 0,
-        backGaugeJogSpeed: 0,
+        backGaugeJogSpeed: defaultJogSpeed(),
         overrideFinalBendPositionEnabled: false,
         overriddenFinalBendPosition: 0,
         punchId: null,
@@ -725,6 +743,7 @@ function makeEmptyBend() {
 function buildTableRow(bend, index) {
     const tr = document.createElement("tr");
     tr.dataset.bendId = bend.id;
+    tr.dataset.bgJogSpeed = (bend.backGaugeJogSpeed != null && bend.backGaugeJogSpeed !== "") ? bend.backGaugeJogSpeed : 100;
     tr.setAttribute("draggable", "true");
 
     // Row drag
@@ -895,7 +914,12 @@ function collectBendFromTableRow(tr) {
         backGaugeRefEdgeStopEnabled: !!tr.querySelector('[name="backGaugeRefEdgeStopEnabled"]')?.checked,
         backGaugeXPosition: lin("backGaugeXPosition", 0),
         backGaugeRPosition: lin("backGaugeRPosition", 0),
-        backGaugeJogSpeed: parseFloat(get("backGaugeJogSpeed")) || 0,
+        backGaugeJogSpeed: (() => {
+            const v = parseFloat(get("backGaugeJogSpeed"));
+            if (!isNaN(v)) return v;
+            const stashed = parseFloat(tr.dataset.bgJogSpeed);
+            return isNaN(stashed) ? 100 : stashed;
+        })(),
         overrideFinalBendPositionEnabled: false,
         overriddenFinalBendPosition: 0,
         punchId: get("punchId") || null,
@@ -1556,7 +1580,7 @@ function renderDxfBendPlanner() {
                     materialThickness: _dxfAnalysis.thickness_inch || 0.06,
                     punchToMaterialClearance: 0.1, additionalRetractAfterBend: 0,
                     bendWidth: 12, backGaugeRefEdgeStop: "G54", backGaugeRefEdgeStopEnabled: false,
-                    backGaugeXPosition: 0, backGaugeRPosition: 0, backGaugeJogSpeed: "",
+                    backGaugeXPosition: 0, backGaugeRPosition: 0, backGaugeJogSpeed: defaultJogSpeed(),
                     overrideFinalBendPositionEnabled: false, overriddenFinalBendPosition: 0,
                     punchId: null, dieId: null, materialId: _dxfAnalysis.matched_material_id || null,
                 });
@@ -2054,12 +2078,43 @@ function wireToolingModal() {
     // Material CRUD
     document.getElementById("saveMaterialBtn").addEventListener("click", saveMaterial);
     document.getElementById("cancelMaterialEditBtn").addEventListener("click", cancelMaterialEdit);
+
+    // Settings
+    document.getElementById("saveSettingsBtn").addEventListener("click", saveSettings);
 }
 
 function openToolingModal() {
     document.getElementById("toolingModal").classList.remove("hidden");
     renderToolingLists();
     renderGaugeGrid({});
+    document.getElementById("settingsDefaultJogSpeed").value = defaultJogSpeed();
+    document.getElementById("settingsSaveStatus").textContent = "";
+}
+
+async function saveSettings() {
+    const input = document.getElementById("settingsDefaultJogSpeed");
+    const status = document.getElementById("settingsSaveStatus");
+    const v = parseFloat(input.value);
+    if (isNaN(v) || v < 1 || v > 300) {
+        status.textContent = "Enter a number between 1 and 300";
+        status.style.color = "var(--accent)";
+        return;
+    }
+    const resp = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ default_jog_speed: v }),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+        tooling.settings = data.settings;
+        status.textContent = "Saved";
+        status.style.color = "var(--text-dim)";
+        showStatus("Default IPM updated to " + v, "success");
+    } else {
+        status.textContent = data.error || "Save failed";
+        status.style.color = "var(--accent)";
+    }
 }
 
 function closeToolingModal() {

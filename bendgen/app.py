@@ -21,7 +21,7 @@ from .dxf_analyzer import analyze_dxf, analysis_to_bend_dicts, analysis_to_summa
 from .image_analyzer import analyze_image, has_ocr
 
 app = Flask(__name__)
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 # --- Local persistence ---
 _DATA_DIR = Path.home() / ".bendgen"
@@ -37,6 +37,9 @@ def _save_state():
         "dies": [die_to_dict(d) for d in _state["dies"]],
         "punches": [punch_to_dict(p) for p in _state["punches"]],
         "materials": [material_to_dict(m) for m in _state["materials"]],
+        "settings": {
+            "default_jog_speed": _state.get("default_jog_speed", DEFAULT_JOG_SPEED),
+        },
     }
     _DATA_FILE.write_text(json.dumps(data, indent=2))
 
@@ -106,10 +109,20 @@ def _load_state():
             )
             for b in data["bends"]
         ]
+    settings = data.get("settings") or {}
+    raw_default = settings.get("default_jog_speed", DEFAULT_JOG_SPEED)
+    try:
+        v = float(raw_default)
+        _state["default_jog_speed"] = v if v > 0 else DEFAULT_JOG_SPEED
+    except (ValueError, TypeError):
+        _state["default_jog_speed"] = DEFAULT_JOG_SPEED
     print(f"Loaded state from {_DATA_FILE}: {len(_state['programs'])} programs, "
           f"{len(_state['bends'])} bends, {len(_state['dies'])} dies, "
-          f"{len(_state['punches'])} punches, {len(_state['materials'])} materials")
+          f"{len(_state['punches'])} punches, {len(_state['materials'])} materials, "
+          f"default IPM = {_state['default_jog_speed']}")
 
+
+DEFAULT_JOG_SPEED = 100.0  # IPM — back gauge speed used when nothing else specifies
 
 # In-memory session state
 _state = {
@@ -119,6 +132,7 @@ _state = {
     "punches": list(STOCK_PUNCHES),
     "materials": list(STOCK_MATERIALS),
     "existing_zip": None,  # bytes | None — imported backup for merging
+    "default_jog_speed": DEFAULT_JOG_SPEED,
 }
 
 # Load persisted state on startup
@@ -132,6 +146,7 @@ def _reset_state():
     _state["punches"] = list(STOCK_PUNCHES)
     _state["materials"] = list(STOCK_MATERIALS)
     _state["existing_zip"] = None
+    _state["default_jog_speed"] = DEFAULT_JOG_SPEED
     _save_state()
 
 
@@ -158,7 +173,26 @@ def get_tooling():
         "punches": [punch_to_dict(p) for p in _state["punches"]],
         "materials": [material_to_dict(m) for m in _state["materials"]],
         "limits": LIMITS,
+        "settings": {
+            "default_jog_speed": _state["default_jog_speed"],
+        },
     })
+
+
+@app.route("/api/settings", methods=["POST"])
+def save_settings():
+    """Update user-editable defaults (currently just default back gauge IPM)."""
+    data = request.json or {}
+    if "default_jog_speed" in data:
+        try:
+            v = float(data["default_jog_speed"])
+        except (ValueError, TypeError):
+            return jsonify({"ok": False, "error": "default_jog_speed must be a number"}), 400
+        if not (1.0 <= v <= 300.0):
+            return jsonify({"ok": False, "error": "default_jog_speed must be between 1 and 300 IPM"}), 400
+        _state["default_jog_speed"] = v
+        _save_state()
+    return jsonify({"ok": True, "settings": {"default_jog_speed": _state["default_jog_speed"]}})
 
 
 @app.route("/api/programs", methods=["GET"])
@@ -180,9 +214,22 @@ def save_program():
     new_bends = []
     errors = []
 
+    # Index existing bends so we can preserve fields (like IPM jog speed) that
+    # the frontend may not surface in its form.
+    existing_by_id = {str(b.id): b for b in _state["bends"]}
+
+    default_jog = _state["default_jog_speed"]
     for i, bd in enumerate(bend_defs):
+        bid = bd.get("id") or str(uuid4())
+        prior = existing_by_id.get(str(bid))
+        prior_jog = prior.backGaugeJogSpeed if prior else default_jog
+        jog_raw = bd.get("backGaugeJogSpeed", prior_jog)
+        try:
+            jog_speed = float(jog_raw) if jog_raw not in ("", None) else prior_jog
+        except (ValueError, TypeError):
+            jog_speed = prior_jog
         bend = Bend(
-            id=bd.get("id") or str(uuid4()),
+            id=bid,
             name=bd.get("name", f"Bend {i + 1}"),
             notes=bd.get("notes", ""),
             desiredBendAngle=float(bd.get("desiredBendAngle", 90.0)),
@@ -196,7 +243,7 @@ def save_program():
             backGaugeRefEdgeStopEnabled=bool(bd.get("backGaugeRefEdgeStopEnabled", False)),
             backGaugeXPosition=float(bd.get("backGaugeXPosition", 0.0)),
             backGaugeRPosition=float(bd.get("backGaugeRPosition", 0.0)),
-            backGaugeJogSpeed=bd.get("backGaugeJogSpeed", ""),
+            backGaugeJogSpeed=jog_speed,
             overrideFinalBendPositionEnabled=bool(bd.get("overrideFinalBendPositionEnabled", False)),
             overriddenFinalBendPosition=float(bd.get("overriddenFinalBendPosition", 0.0)),
             punchId=bd.get("punchId"),
@@ -460,6 +507,7 @@ def analyze_dxf_upload():
         bend_plan=None,
         thickness_override=thickness_override,
         default_material_id=matched_material_id,
+        default_jog_speed=_state["default_jog_speed"],
     )
 
     # Derive program name from filename (strip extension and "Flat-Pattern - " prefix)
@@ -515,6 +563,7 @@ def reanalyze_dxf():
         bend_plan=bend_plan,
         thickness_override=thickness_override,
         default_material_id=matched_material_id,
+        default_jog_speed=_state["default_jog_speed"],
     )
 
     filename = _state.get("_last_dxf_filename", "drawing.dxf")
@@ -602,7 +651,7 @@ def analyze_image_upload():
             "backGaugeRefEdgeStopEnabled": False,
             "backGaugeXPosition": 0.0,
             "backGaugeRPosition": 0.0,
-            "backGaugeJogSpeed": "",
+            "backGaugeJogSpeed": _state["default_jog_speed"],
             "overrideFinalBendPositionEnabled": False,
             "overriddenFinalBendPosition": 0.0,
             "punchId": None,

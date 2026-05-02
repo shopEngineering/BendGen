@@ -818,6 +818,7 @@ def analysis_to_bend_dicts(
     default_punch_id: str | None = None,
     default_die_id: str | None = None,
     default_material_id: str | None = None,
+    default_jog_speed: float = 100.0,
 ) -> list[dict]:
     """Convert DXF analysis results to bend definition dicts for the API.
 
@@ -885,7 +886,7 @@ def analysis_to_bend_dicts(
             "backGaugeRefEdgeStopEnabled": True,
             "backGaugeXPosition": round(bg_x, 3),
             "backGaugeRPosition": 0.0,
-            "backGaugeJogSpeed": 0.0,
+            "backGaugeJogSpeed": default_jog_speed,
             "overrideFinalBendPositionEnabled": False,
             "overriddenFinalBendPosition": 0.0,
             "punchId": punch_id,
