@@ -449,6 +449,8 @@
         <li>Click <kbd>Create Program</kbd> to generate a program with all detected bends.</li>
     </ol>
 
+    <p><strong>Angle convention.</strong> CAD flat-pattern notes (SolidWorks, Inventor, Fusion, Onshape) give the <em>bend angle</em>: 90&deg; is a right angle and 180&deg; is a hem. The BendControl wants the <em>included angle</em>, so by default BendGen programs 180 &minus; the label (a &ldquo;UP 45&deg;&rdquo; label becomes a 135&deg; included bend; 90&deg; is unchanged). If your drawing labels already use included angles, change <kbd>Drawing angles are</kbd> to <em>Included angle</em> in the preview; the choice is remembered. Where the programmed angle differs from the label, the planner shows both, e.g. 135&deg; (label 45&deg;). A bend that comes out outside 15&ndash;170&deg; (such as a hem) is flagged with a warning and can&rsquo;t be saved until you fix it.</p>
+
     <div class="callout">
         <p><strong>Tip:</strong> Hover a bend row in the planner to highlight it in the drawing. Click edges in the table to set the BG X reference per bend.</p>
     </div>

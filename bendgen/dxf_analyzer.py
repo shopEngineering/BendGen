@@ -79,7 +79,8 @@ class DxfBendLine:
     x_start: float = 0.0  # actual start X of the line
     x_end: float = 0.0    # actual end X of the line
     direction: str = ""  # "UP" or "DOWN"
-    angle: float = 90.0  # bend angle in degrees
+    angle: float = 90.0  # INCLUDED angle in degrees (what BendControl's desiredBendAngle expects)
+    label_angle: float | None = None  # raw angle as written in the DXF label (None if unlabeled)
     radius: float = 0.0  # inside bend radius
     label_text: str = ""  # raw label text found nearby
 
@@ -104,6 +105,25 @@ class DxfAnalysis:
     circles: list = field(default_factory=list)  # raw circle data for SVG
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+
+
+LABEL_ANGLE_MODES = ("bend", "included")
+# BendControl's desiredBendAngle limits (see models.LIMITS)
+_MIN_INCLUDED, _MAX_INCLUDED = 15.0, 170.0
+
+
+def normalize_label_angle_mode(mode) -> str:
+    """Return a valid label-angle convention ("bend" default, or "included")."""
+    return mode if mode in LABEL_ANGLE_MODES else "bend"
+
+
+def _label_to_included(label_angle: float, mode: str) -> float:
+    """Convert a drawing-label angle to the included angle BendControl expects.
+
+    CAD flat-pattern notes give the BEND (deflection) angle: 0 = flat, 90 = right
+    angle, 180 = hem. The included angle is 180 - bend angle.
+    """
+    return round(180.0 - label_angle, 4) if mode == "bend" else label_angle
 
 
 def _ensure_ezdxf():
@@ -326,12 +346,18 @@ def debug_dxf(file_bytes: bytes) -> dict:
     }
 
 
-def analyze_dxf(file_path: str = None, file_bytes: bytes = None) -> DxfAnalysis:
+def analyze_dxf(file_path: str = None, file_bytes: bytes = None,
+                label_angle_mode: str = "bend") -> DxfAnalysis:
     """Analyze a DXF flat-pattern drawing and extract bend information.
 
     Provide either file_path or file_bytes (not both).
+    label_angle_mode: how angles in the drawing's bend labels are meant.
+      "bend" (default, CAD convention): label is the bend/deflection angle, so
+             included = 180 - label.
+      "included": label is already the included angle and is used as-is.
     """
     _ensure_ezdxf()
+    label_angle_mode = normalize_label_angle_mode(label_angle_mode)
 
     analysis = DxfAnalysis()
 
@@ -575,7 +601,8 @@ def analyze_dxf(file_path: str = None, file_bytes: bytes = None) -> DxfAnalysis:
             if parsed["direction"]:
                 bend.direction = parsed["direction"]
             if parsed["angle"] is not None:
-                bend.angle = parsed["angle"]
+                bend.label_angle = parsed["angle"]
+                bend.angle = _label_to_included(parsed["angle"], label_angle_mode)
             if parsed["radius"] is not None:
                 bend.radius = parsed["radius"]
 
@@ -617,6 +644,26 @@ def analyze_dxf(file_path: str = None, file_bytes: bytes = None) -> DxfAnalysis:
 
     # Sort bend lines by position (left to right)
     analysis.bend_lines.sort(key=lambda b: b.x)
+
+    # Warn about labeled bends whose included angle BendControl can't form.
+    # The value is left as-is so validation still blocks saving it.
+    for i, bend in enumerate(analysis.bend_lines):
+        if bend.label_angle is None:
+            continue
+        if _MIN_INCLUDED <= bend.angle <= _MAX_INCLUDED:
+            continue
+        name = f"Bend {i + 1}: {bend.direction or '?'} {bend.label_angle:g}\u00b0"
+        if bend.angle <= 0:
+            analysis.warnings.append(
+                f"{name} is a hem (included {bend.angle:g}\u00b0). It can't be formed "
+                "in one hit on BendControl, so program a pre-bend plus a flatten."
+            )
+        else:
+            analysis.warnings.append(
+                f"{name} gives an included angle of {bend.angle:g}\u00b0, outside "
+                f"BendControl's {_MIN_INCLUDED:g}-{_MAX_INCLUDED:g}\u00b0 range. "
+                "Check the angle convention or edit the angle."
+            )
 
     return analysis
 
@@ -711,6 +758,11 @@ def generate_svg(analysis: DxfAnalysis, width: int = 600) -> str:
         color = UP_COLOR if bl.direction != "DOWN" else DOWN_COLOR
         dash = 'stroke-dasharray="8,4"' if bl.direction == "DOWN" else ""
         dir_label = bl.direction or "?"
+        # Show the included angle that will be programmed; add the drawing's
+        # label angle when it differs, e.g. "135° (label 45°)"
+        angle_txt = f"{bl.angle:g}\u00b0"
+        if bl.label_angle is not None and bl.label_angle != bl.angle:
+            angle_txt += f" (label {bl.label_angle:g}\u00b0)"
 
         # SVG coordinates for the actual line endpoints
         sx1, sy1 = tx(bl.x_start), ty(bl.y_start)
@@ -750,7 +802,7 @@ def generate_svg(analysis: DxfAnalysis, width: int = 600) -> str:
             f'transform="rotate({rot}, {label_x}, {label_y})" '
             f'font-size="11" font-weight="600" fill="{color}" '
             f'font-family="sans-serif" class="bend-label" '
-            f'data-bend-idx="{i}">{i+1}. {dir_label} {bl.angle}\u00b0</text>'
+            f'data-bend-idx="{i}">{i+1}. {dir_label} {angle_txt}</text>'
         )
         parts.append('</g>')
 
@@ -912,6 +964,7 @@ def analysis_to_summary(analysis: DxfAnalysis) -> dict:
                 "index": i,
                 "direction": bl.direction or "unknown",
                 "angle": bl.angle,
+                "label_angle": bl.label_angle,
                 "radius": bl.radius,
                 "bend_width": round(abs(bl.y_end - bl.y_start), 1) or round(abs(bl.x_end - bl.x_start), 1) or round(analysis.part_width, 1),
                 "x_position": round(bl.x, 4),

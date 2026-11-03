@@ -17,11 +17,11 @@ from .generator import (
     die_to_dict, punch_to_dict, material_to_dict,
 )
 from .merge import load_from_zip, merge_and_generate_zip
-from .dxf_analyzer import analyze_dxf, analysis_to_bend_dicts, analysis_to_summary, debug_dxf
+from .dxf_analyzer import analyze_dxf, analysis_to_bend_dicts, analysis_to_summary, debug_dxf, normalize_label_angle_mode
 from .image_analyzer import analyze_image, has_ocr
 
 app = Flask(__name__)
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 
 # --- Local persistence ---
 _DATA_DIR = Path.home() / ".bendgen"
@@ -477,6 +477,8 @@ def analyze_dxf_upload():
       - file: the DXF file
       - ref_edge (optional): "left" or "right" for BG X reference
       - thickness (optional): material thickness override in inches
+      - label_angle_mode (optional): "bend" (default; label is the CAD bend angle,
+        included = 180 - label) or "included" (label used as-is)
     """
     if "file" not in request.files:
         return jsonify({"ok": False, "error": "No file uploaded"}), 400
@@ -488,7 +490,8 @@ def analyze_dxf_upload():
     thickness_str = request.form.get("thickness", "")
     thickness_override = float(thickness_str) if thickness_str else None
 
-    analysis = analyze_dxf(file_bytes=dxf_bytes)
+    label_angle_mode = normalize_label_angle_mode(request.form.get("label_angle_mode"))
+    analysis = analyze_dxf(file_bytes=dxf_bytes, label_angle_mode=label_angle_mode)
 
     if analysis.errors:
         return jsonify({"ok": False, "errors": analysis.errors}), 400
@@ -524,6 +527,7 @@ def analyze_dxf_upload():
     # Store DXF bytes in session so edge/thickness changes can re-analyze
     _state["_last_dxf"] = dxf_bytes
     _state["_last_dxf_filename"] = filename
+    _state["_last_label_angle_mode"] = label_angle_mode
 
     return jsonify({"ok": True, "analysis": summary})
 
@@ -534,7 +538,8 @@ def reanalyze_dxf():
 
     Accepts JSON: {
         bend_plan: [{index, edge}, ...],  // bend order + per-bend edge
-        thickness: float | null
+        thickness: float | null,
+        label_angle_mode: "bend" | "included"  // must match the mode the user picked
     }
     """
     dxf_bytes = _state.get("_last_dxf")
@@ -547,7 +552,10 @@ def reanalyze_dxf():
     if thickness_override is not None:
         thickness_override = float(thickness_override)
 
-    analysis = analyze_dxf(file_bytes=dxf_bytes)
+    label_angle_mode = normalize_label_angle_mode(
+        data.get("label_angle_mode") or _state.get("_last_label_angle_mode"))
+    _state["_last_label_angle_mode"] = label_angle_mode
+    analysis = analyze_dxf(file_bytes=dxf_bytes, label_angle_mode=label_angle_mode)
     if analysis.errors:
         return jsonify({"ok": False, "errors": analysis.errors}), 400
 

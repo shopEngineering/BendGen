@@ -1148,3 +1148,10 @@ main {
     .dxf-preview-layout { flex-direction: column; }
     .dxf-controls { width: 100%; }
 }
+
+.angle-label-note {
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+.angle-label-note:empty { display: none; }

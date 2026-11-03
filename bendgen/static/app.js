@@ -60,6 +60,7 @@ function wireEvents() {
     document.getElementById("checkUpdateBtn").addEventListener("click", checkForUpdates);
     document.getElementById("importFile").addEventListener("change", importBackup);
     document.getElementById("importDxfFile").addEventListener("change", importDxf);
+    document.getElementById("dxfLabelAngleMode").addEventListener("change", _onLabelAngleModeChange);
     const importImageEl = document.getElementById("importImageFile");
     if (importImageEl) importImageEl.addEventListener("change", importImage);
     document.getElementById("formViewBtn").addEventListener("click", () => switchView("form"));
@@ -560,7 +561,7 @@ function collectBendFromCard(card) {
         id: card.dataset.bendId,
         name: card.querySelector(".bend-name").value,
         notes: get("notes") || "",
-        desiredBendAngle: parseFloat(get("desiredBendAngle")) || 90,
+        desiredBendAngle: (v => isNaN(v) ? 90 : v)(parseFloat(get("desiredBendAngle"))),
         angleCompensation: parseFloat(get("angleCompensation")) || 0,
         angleCompensationReversed: get("angleCompensationReversed") === "true",
         materialThickness: lin("materialThickness", 0.06),
@@ -903,7 +904,7 @@ function collectBendFromTableRow(tr) {
         id: tr.dataset.bendId,
         name: get("name") || "",
         notes: "",
-        desiredBendAngle: parseFloat(get("desiredBendAngle")) || 90,
+        desiredBendAngle: (v => isNaN(v) ? 90 : v)(parseFloat(get("desiredBendAngle"))),
         angleCompensation: parseFloat(get("angleCompensation")) || 0,
         angleCompensationReversed: get("angleCompensationReversed") === "true",
         materialThickness: lin("materialThickness", 0.06),
@@ -1045,6 +1046,67 @@ let _dxfAnalysis = null;  // current analysis data from server
 let _dxfBendPlan = [];    // [{index, edge, mergedIndices?, ...}, ...] — ordered bend plan
 let _dxfSelectedRows = new Set();  // order indices selected for merging
 
+// How angles in the drawing's bend labels are meant: "bend" (CAD default,
+// included = 180 - label) or "included" (label used as-is).
+const LABEL_ANGLE_MODE_KEY = "bendgen_label_angle_mode";
+
+function _getLabelAngleMode() {
+    try {
+        return localStorage.getItem(LABEL_ANGLE_MODE_KEY) === "included" ? "included" : "bend";
+    } catch (e) {
+        return "bend";
+    }
+}
+
+function _setLabelAngleMode(mode) {
+    try {
+        localStorage.setItem(LABEL_ANGLE_MODE_KEY, mode);
+    } catch (e) { /* storage unavailable; choice just won't persist */ }
+}
+
+// Text for "label 45°" when the drawing's label angle differs from the angle
+// that will be programmed (plan.angle); "" otherwise.
+function _labelAngleNote(bend, angle) {
+    if (!bend || bend.label_angle === null || bend.label_angle === undefined) return "";
+    if (Number(bend.label_angle) === Number(angle)) return "";
+    return `label ${bend.label_angle}\u00b0`;
+}
+
+// Re-run the analysis with a new label-angle convention and refresh the planner.
+// Keeps the user's bend order, edges, tooling, and any angle they typed in by hand.
+async function _onLabelAngleModeChange(e) {
+    const sel = e.target;
+    const mode = sel.value === "included" ? "included" : "bend";
+    _setLabelAngleMode(mode);
+    if (!_dxfAnalysis || _importMode !== "dxf") return;
+
+    try {
+        const resp = await fetch("/api/reanalyze-dxf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bend_plan: null, label_angle_mode: mode }),
+        });
+        const data = await resp.json();
+        if (!data.ok) throw new Error((data.errors || [data.error]).join(", "));
+
+        const oldBends = _dxfAnalysis.bends;
+        const newBends = data.analysis.bends;
+        _dxfBendPlan.forEach(p => {
+            const o = oldBends[p.index], n = newBends[p.index];
+            // Only follow the new convention if the user hasn't edited this angle
+            if (o && n && p.angle === o.angle) p.angle = n.angle;
+        });
+        _dxfAnalysis = data.analysis;
+        _renderDxfSvgAndInfo();
+        renderDxfBendPlanner();
+        _updateAllSvgBends();
+    } catch (err) {
+        showStatus("Re-analysis failed: " + err.message, "error");
+        sel.value = mode === "bend" ? "included" : "bend";
+        _setLabelAngleMode(sel.value);
+    }
+}
+
 function _getBendWidth(plan) {
     // For merged bends, sum the widths of all constituent segments
     const a = _dxfAnalysis;
@@ -1137,6 +1199,7 @@ async function importDxf(event) {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("label_angle_mode", _getLabelAngleMode());
 
     const resp = await fetch("/api/analyze-dxf", { method: "POST", body: formData });
     const data = await resp.json();
@@ -1215,18 +1278,9 @@ function _populateDxfSelect(selEl, items, valueKey, labelKey, selectedVal) {
     });
 }
 
-function openDxfPreview() {
+function _renderDxfSvgAndInfo() {
     const a = _dxfAnalysis;
     const modal = document.getElementById("dxfPreviewModal");
-    modal.classList.remove("hidden");
-
-    // Update modal title based on mode
-    const modalTitle = modal.querySelector(".modal-header h2");
-    if (modalTitle) {
-        modalTitle.textContent = _importMode === "image"
-            ? "Image Analysis — Bend Planner"
-            : "DXF Drawing — Bend Planner";
-    }
 
     // Render SVG or Image
     const svgContainer = document.getElementById("dxfSvgContainer");
@@ -1245,7 +1299,7 @@ function openDxfPreview() {
     }
 
     // Info panel
-    let info = `<strong>${a.program_name || "Drawing"}</strong><br>`;
+    let info = `<strong>${escHtml(a.program_name || "Drawing")}</strong><br>`;
     if (_importMode === "dxf") {
         info += `Part: ${a.part_length}" &times; ${a.part_width}"<br>`;
     }
@@ -1257,9 +1311,30 @@ function openDxfPreview() {
     }
     if (a.ai_notes) info += `<br><span style="color:var(--text-dim)">Notes: ${a.ai_notes}</span>`;
     if (a.warnings && a.warnings.length) {
-        info += `<br><span style="color:var(--warning)">${a.warnings.join("; ")}</span>`;
+        info += `<br><span style="color:var(--warning)">${escHtml(a.warnings.join("; "))}</span>`;
     }
     document.getElementById("dxfInfo").innerHTML = info;
+}
+
+function openDxfPreview() {
+    const a = _dxfAnalysis;
+    const modal = document.getElementById("dxfPreviewModal");
+    modal.classList.remove("hidden");
+
+    // Update modal title based on mode
+    const modalTitle = modal.querySelector(".modal-header h2");
+    if (modalTitle) {
+        modalTitle.textContent = _importMode === "image"
+            ? "Image Analysis — Bend Planner"
+            : "DXF Drawing — Bend Planner";
+    }
+
+    // Label-angle convention selector (DXF only)
+    const modeEl = document.getElementById("dxfLabelAngleMode");
+    modeEl.value = _getLabelAngleMode();
+    modeEl.closest(".dxf-default-row").classList.toggle("hidden", _importMode === "image");
+
+    _renderDxfSvgAndInfo();
 
     // Thickness override
     const thickInput = document.getElementById("dxfThicknessOverride");
@@ -1376,6 +1451,8 @@ function _updateSvgBend(bendIdx) {
     const dir = plan.direction || "?";
     const angle = plan.angle;
     const orderIdx = _dxfBendPlan.indexOf(plan);
+    const note = _labelAngleNote(_dxfAnalysis.bends[plan.index], angle);
+    const angleTxt = `${angle}\u00b0${note ? ` (${note})` : ""}`;
 
     const UP_COLOR = "#2980b9";
     const DOWN_COLOR = "#e74c3c";
@@ -1392,10 +1469,10 @@ function _updateSvgBend(bendIdx) {
             if (indices.length > 1) {
                 // Merged: show order number on first segment, "+" on others
                 label.textContent = subIdx === 0
-                    ? `${orderIdx + 1}. ${dir} ${angle}\u00b0 [merged]`
+                    ? `${orderIdx + 1}. ${dir} ${angleTxt} [merged]`
                     : `\u2191 ${orderIdx + 1}`;
             } else {
-                label.textContent = `${orderIdx + 1}. ${dir} ${angle}\u00b0`;
+                label.textContent = `${orderIdx + 1}. ${dir} ${angleTxt}`;
             }
             label.setAttribute("fill", color);
         }
@@ -1438,7 +1515,7 @@ function renderDxfBendPlanner() {
     html += `<table class="planner-table">
         <thead><tr>`;
     if (!isImage) html += `<th class="chk-col"><input type="checkbox" id="plannerSelectAll" title="Select all"></th>`;
-    html += `<th></th><th>#</th><th>Dir</th><th>Angle</th><th>Width</th><th>Edge</th><th>BG X</th>`;
+    html += `<th></th><th>#</th><th>Dir</th><th title="Included angle that will be programmed on BendControl">Incl. Angle</th><th>Width</th><th>Edge</th><th>BG X</th>`;
     html += `<th>Die</th><th>Punch</th><th>BG</th><th></th>`;
     html += `</tr></thead>
         <tbody>`;
@@ -1460,7 +1537,7 @@ function renderDxfBendPlanner() {
                     <option value="DOWN"${plan.direction === "DOWN" ? " selected" : ""}>DOWN</option>
                 </select>
             </td>
-            <td><input type="number" class="angle-input" data-order="${orderIdx}" value="${plan.angle}" min="15" max="170" step="0.1">&deg;</td>`;
+            <td><input type="number" class="angle-input" data-order="${orderIdx}" value="${plan.angle}" min="15" max="170" step="0.1">&deg;${isImage ? "" : `<div class="angle-label-note" title="Angle written in the drawing's bend label">${escHtml(_labelAngleNote(b, plan.angle))}</div>`}</td>`;
 
         if (isImage) {
             // Image mode: editable width and BG X inputs
@@ -1642,7 +1719,11 @@ function renderDxfBendPlanner() {
         inp.addEventListener("input", (e) => {
             const orderIdx = parseInt(e.target.dataset.order);
             _dxfBendPlan[orderIdx].angle = parseFloat(e.target.value) || 90;
-            if (!isImage) _updateSvgBend(_dxfBendPlan[orderIdx].index);
+            if (!isImage) {
+                _updateSvgBend(_dxfBendPlan[orderIdx].index);
+                const noteEl = e.target.parentElement.querySelector(".angle-label-note");
+                if (noteEl) noteEl.textContent = _labelAngleNote(a.bends[_dxfBendPlan[orderIdx].index], _dxfBendPlan[orderIdx].angle);
+            }
         });
     });
 
@@ -1777,7 +1858,7 @@ async function applyDxfImport() {
         const resp = await fetch("/api/reanalyze-dxf", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ bend_plan: planWithTooling, thickness }),
+            body: JSON.stringify({ bend_plan: planWithTooling, thickness, label_angle_mode: _getLabelAngleMode() }),
         });
         const data = await resp.json();
 
@@ -1893,7 +1974,7 @@ function openDxfViewer(dxfSourceId, highlightPlanIndex) {
         html += `<tr class="planner-row${active}" data-order="${orderIdx}" data-bend-idx="${p.index}">
             <td>${orderIdx + 1}</td>
             <td><span class="${p.direction === 'DOWN' ? 'dir-down' : 'dir-up'}">${p.direction || '?'}</span></td>
-            <td>${p.angle || b.angle}&deg;</td>
+            <td>${p.angle ?? b.angle}&deg;${_labelAngleNote(b, p.angle ?? b.angle) ? ` <span class="angle-label-note">(${escHtml(_labelAngleNote(b, p.angle ?? b.angle))})</span>` : ""}</td>
             <td>${width}"${isMerged ? ` <span class="merged-badge">${p.mergedIndices.length}seg</span>` : ""}</td>
         </tr>`;
     });

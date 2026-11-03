@@ -1,0 +1,1 @@
+Run tests with: ../.venv/bin/python tests/test_label_angle.py (from the BendGen dir; no pytest needed)

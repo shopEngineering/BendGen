@@ -377,6 +377,13 @@
                     <div class="dxf-resize-handle" id="dxfResizeHandle"></div>
                     <div class="dxf-controls">
                         <div class="dxf-info" id="dxfInfo"></div>
+                        <div class="dxf-default-row">
+                            <label for="dxfLabelAngleMode" style="width:auto" title="CAD flat-pattern notes (SolidWorks, Inventor, Fusion, Onshape) give the bend angle: 90 = right angle, 180 = hem. BendControl wants the included angle.">Drawing angles are:</label>
+                            <select id="dxfLabelAngleMode">
+                                <option value="bend">Bend angle (CAD default)</option>
+                                <option value="included">Included angle</option>
+                            </select>
+                        </div>
                         <h4 style="margin:6px 0 2px">Defaults</h4>
                         <div class="dxf-default-row">
                             <label>Material</label>
