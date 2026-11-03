@@ -661,8 +661,10 @@ const TABLE_COLUMNS = [
     { key: "dieId",                     label: "Die",         type: "select", source: "dies" },
     { key: "punchId",                   label: "Punch",       type: "select", source: "punches" },
     { key: "materialId",                label: "Material",    type: "select", source: "materials" },
-    { key: "angleCompensationReversed", label: "Comp Dir",    type: "select", options: [
-        { value: "false", label: "Underbent" }, { value: "true", label: "Overbent" }
+    { key: "angleCompensationReversed", label: "Comp Dir",    type: "select",
+      title: "Bend more = part came out underbent (UNDERBENT on the press brake). Bend less = part came out overbent (OVERBENT).",
+      options: [
+        { value: "true", label: "Bend more \u2191" }, { value: "false", label: "Bend less \u2193" }
     ]},
     { key: "angleCompensation",         label: "Comp (\u00b0)",      type: "number", step: "0.1" },
     { key: "punchToMaterialClearance",  label: "Clearance",   type: "number", step: "0.01" },
@@ -815,11 +817,12 @@ function buildTableRow(bend, index) {
         } else if (col.type === "select" && col.options) {
             const select = document.createElement("select");
             select.name = col.key;
+            if (col.title) select.title = col.title;
             col.options.forEach(opt => {
                 const o = document.createElement("option");
                 o.value = opt.value;
                 o.textContent = opt.label;
-                if (opt.value === bend[col.key]) o.selected = true;
+                if (opt.value === String(bend[col.key])) o.selected = true;
                 select.appendChild(o);
             });
             td.appendChild(select);

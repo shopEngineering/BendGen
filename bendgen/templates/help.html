@@ -390,12 +390,13 @@
     <p>Click <kbd>Advanced</kbd> on a bend card to reveal additional fields.</p>
 
     <h3>Angle Compensation</h3>
-    <p>Adjusts the bend angle to account for springback. If your material springs back 2&deg;, set compensation to 2&deg; with direction <strong>Underbent</strong> to overbend by that amount.</p>
+    <p>Adjusts the bend angle to account for springback. If your material springs back 2&deg;, set compensation to 2&deg; with direction <strong>Bend more</strong> to overbend by that amount.</p>
     <img src="/static/help-images/angle_compensation.png" alt="Angle compensation" class="diagram">
     <ul>
-        <li><strong>Underbent</strong> &mdash; actual bend is less than desired; machine bends further to compensate.</li>
-        <li><strong>Overbent</strong> &mdash; actual bend is more than desired; machine bends less.</li>
+        <li><strong>Bend more (part came out underbent)</strong> &mdash; actual bend is less than desired; machine bends further to compensate.</li>
+        <li><strong>Bend less (part came out overbent)</strong> &mdash; actual bend is more than desired; machine bends less.</li>
     </ul>
+    <p>On the press brake&rsquo;s screen these show as <strong>UNDERBENT</strong> (Bend more) and <strong>OVERBENT</strong> (Bend less).</p>
 
     <h3>Additional Retract After Bend</h3>
     <p>Extra distance the ram retracts beyond the default position. Useful for clearance to flip or reposition the workpiece.</p>
@@ -915,7 +916,7 @@ journalctl -u usb-gadget</pre>
     <p>The BendControl&rsquo;s left column has a <strong>Create Bend</strong> view with these fields:</p>
     <ul>
         <li>Desired Bend Angle (included angle in degrees)</li>
-        <li>Angle Compensation (with underbent/overbent toggle)</li>
+        <li>Angle Compensation (with underbent/overbent toggle; BendGen labels these &ldquo;Bend more&rdquo; / &ldquo;Bend less&rdquo;)</li>
         <li>Punch-to-Material Clearance</li>
         <li>Additional Retract After Bend</li>
         <li>Material Thickness</li>
